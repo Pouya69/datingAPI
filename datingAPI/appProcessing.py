@@ -7,7 +7,7 @@ import os
 from time import sleep as sleep_time
 from rest_framework.authtoken.models import Token
 from myapp.models import Message,Group, Date                                         # Our Message model
-from userManagement.models import MyUser,VerifyLink
+from userManagement.models import MyUser, VerifyLink
 from myapp.serializers import MessageSerializer, DateSerializer, GroupSerializer # Our Serializer Classes
 from userManagement.serializers import PictureSerializer, InterestsSerializer, FeelingsSerializer, UserSerializer, \
     VerifySerializer, VerifyUserSerializer, UserGetSerializer
@@ -145,43 +145,6 @@ def email_link(email_user,link):
         print('Email sent!')
     except:
         print('Something went wrong EMAIL...')
-    # Create your views here.
-
-
-def get_user_info(user_objects):
-    data = {}
-    try:
-        for user_object in user_objects:
-
-            data[user_object.username] = {
-                'interests': str_to_list(user_object.interests),
-                'age': user_object.age,
-                'about': user_object.about,
-                'feeling': user_object.feeling,
-                'username': user_object.username
-                }
-    except TypeError:
-        data['user'] = {
-                'interests': str_to_list(user_objects.interests),
-                'age': user_objects.age,
-                'about': user_object.about,
-                'feeling': user_objects.feeling,
-                'username': user_object.username
-                }
-    return data
-
-
-def get_user_info_profile(user_object):
-    data = {user_object.username: {
-        'interests': str_to_list(user_object.interests),
-        'status': user_object.status,
-        'dating_with': user_object.dating_with,
-        'age': user_object.age,
-        'feeling': user_object.feeling,
-        'followings': user_object.following.all().count,
-        'followers': user_object.followers.all().count
-    }}
-    return data
 
 
 def get_user_by_token(req_meta):
@@ -193,27 +156,6 @@ def get_user_by_token(req_meta):
         return None
 
 
-def is_token_ok(token, user_obj):
-    try:
-        Token.objects.get(key=token, user=user_obj)
-        return True
-    except Token.DoesNotExist:
-        return False
-
-
-def is_user_ok(user):
-    try:
-        username = user.username
-        password = user.password
-        userModel = MyUser.objects.get(username=username)
-        if userModel.check_password(password):
-            return True
-        else:
-            return False
-    except:
-        return False
-
-
 def get_user_random(me):
     tries = 0
     while True:
@@ -222,6 +164,8 @@ def get_user_random(me):
             raise MyUser.DoesNotExist
         randomed = random.choice(MyUser.objects.all())
         if not randomed == me and randomed not in me.friends.all():
+            me.users_searched_day += 1
+            me.save()
             return randomed
 
 
@@ -238,7 +182,6 @@ def get_user_by_interests(interests, genderR, me):
                     me.users_searched_day += 1
                     me.save()
                     return r
-    # TESTED
 
 
 def get_user_by_interests_PREMIUM(interests, genderR, me, with_interests):
@@ -252,10 +195,11 @@ def get_user_by_interests_PREMIUM(interests, genderR, me, with_interests):
             if not r == me and r not in me.friends.all():
                 if with_interests:
                     if interest in str_to_list(r.interests):
+                        me.users_searched_day += 1
+                        me.save()
                         return r
                 else:
                     return r
-# TESTED
 
 
 def date_notification(data):
@@ -300,7 +244,7 @@ def generateLink(user):
         pass
     VerifyLink.objects.create(token=tok, user=user)
     ## EMAIL THE LINK
-    #try:  TODO
+    #try:
         #email_link(user.email, mLink)
     #except:
-        #print('exception')
+        #print('Less Secure Apps Gmail')

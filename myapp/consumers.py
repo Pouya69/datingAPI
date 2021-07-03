@@ -2,7 +2,7 @@ import json
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
 from .models import Message, Group, MyUser
-from datingAPI.processing import get_download_link_from_file
+from datingAPI.appProcessing import get_download_link_from_file
 from .serializers import MessageSerializer, MessageSerializerWrite
 from django.contrib.auth.models import AnonymousUser
 

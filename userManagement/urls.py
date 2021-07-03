@@ -3,7 +3,7 @@ from django.urls import path
 import threading
 from . import views
 
-from datingAPI import processing
+from datingAPI import appProcessing
 urlpatterns = [
     path('login', views.LoginView.as_view(), name='login'),  # For POST login a user
     path('logout', views.LogoutView.as_view(), name='logout'),  # For POST logout a user
@@ -35,8 +35,8 @@ urlpatterns = [
 
 ## After Runserver
 
-init_thread = threading.Thread(target=processing.init_tasks, name="initer")
+init_thread = threading.Thread(target=appProcessing.init_tasks, name="initer")
 init_thread.start()
 
-init_thread2 = threading.Thread(target=processing.init_tasks2, name="initer2")
+init_thread2 = threading.Thread(target=appProcessing.init_tasks2, name="initer2")
 init_thread2.start()

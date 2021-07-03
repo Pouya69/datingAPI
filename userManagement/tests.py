@@ -45,7 +45,6 @@ class User1Test(APITestCase):
         response = self.client.post(path=f"{self.url}/api/login", data=data, format='json')
         self.assertEqual(response.status_code, 200)
         json_response = response.json()
-        # print(json_response)
         token = json_response['token']
         self.assertNotEqual(token, "")
         self.token_1 = token
@@ -65,7 +64,6 @@ class User1Test(APITestCase):
     def test_feeling(self):
         response = self.client.get(path=f"{self.url}/api/feeling", format='json')
         json_response = response.json()
-        print(json_response)
         self.assertEqual("nothing", json_response['feeling'])
         data = {
             'feeling': 'happy'
@@ -136,7 +134,6 @@ class User1Test(APITestCase):
         response = self.client.post(path=f"{self.url}/api/login", data=data, format='json')
         self.assertEqual(response.status_code, 200)
         json_response = response.json()
-        # print(json_response)
         token = json_response['token']
         self.assertNotEqual(token, "")
         self.token_1 = token
@@ -249,7 +246,6 @@ class User1Test(APITestCase):
         user_2 = MyUser.objects.get(username="catfish_2")
         self.assertEqual(user_1.dating_with, None)
         self.assertEqual(user_2.dating_with, None)
-
 
     def test_dating(self):
         user_1 = MyUser.objects.get(username="pouyad_ai")

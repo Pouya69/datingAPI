@@ -3,7 +3,7 @@ from django.http.response import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.parsers import JSONParser
 from stripe import Customer, Subscription, PaymentMethod
-from datingAPI.processing import *
+from datingAPI.appProcessing import *
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import authentication
