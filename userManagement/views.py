@@ -21,71 +21,69 @@ class PremiumBuyView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def post(self, request):
-        data = JSONParser().parse(request)
-        email = data['email']
-        payment_method_id = None
-        payment_method_obj = None
-        try:
-            card_number = data["card_number"]
-            card_cvc = data["card_cvc"]
-            card_exp_year = int(data["card_exp_year"])
-            card_exp_month = int(data["card_exp_month"])
-        except KeyError:
-            payment_method_id = data["payment_method_id"]
-        except TypeError:
-            return JsonResponse({"status": "INVALID VALUES"}, status=400)
-
-        if payment_method_id:
-            try:
-                payment_method_obj = PaymentMethod.retrieve(payment_method_id,)
-            except:
-                return JsonResponse({"status": "No Payment found"}, status=404)
-        else:
-            payment_method_obj = PaymentMethod.create(
-                type="card",
-                card={
-                    "number": card_number,
-                    "exp_month": card_exp_month,
-                    "exp_year": card_exp_year,
-                    "cvc": card_cvc,
-                },
-            )
-        
-        customer_data = Customer.list(email=email).data
-
-        extra_msg = ""
-        # if the array is empty it means the email has not been used yet  
-        if len(customer_data) == 0:
-            # creating customer
-            customer = Customer.create(
-            email=email, payment_method=payment_method_obj.id, invoice_settings={
-            'default_payment_method': payment_method_obj.id
-        })  
-            
-        else:
-            customer = customer_data[0]
-            extra_msg = "Customer already existed."
-
-        ss = Subscription.create(
-            customer=customer,
-            items=[
-                {
-                    'price': 'price_1IId2OBBdPclVL6EeTfyry3v'  # Premium Plan
-                }
-            ]
-        )
-        #me = get_user_by_token(request.META)
-        #if me is None:
-                #return JsonResponse({'status': 'Invalid token'}, status=404)
-        #me.premium = True
-        #me.save()
-        return JsonResponse({'status': 'PREMIUM OK', 'customer_id': customer.id, 'subscription_id': ss.id, 'extra_message': extra_msg}, status=200)
-        #else:
-            #return JsonResponse({'status': 'INVALID CREDENTIALS'}, status=404)
+        # data = JSONParser().parse(request)
+        # email = data['email']
+        # payment_method_id = None
+        # payment_method_obj = None
+        # try:
+        #     card_number = data["card_number"]
+        #     card_cvc = data["card_cvc"]
+        #     card_exp_year = int(data["card_exp_year"])
+        #     card_exp_month = int(data["card_exp_month"])
+        # except KeyError:
+        #     payment_method_id = data["payment_method_id"]
+        # except TypeError:
+        #     return JsonResponse({"status": "INVALID VALUES"}, status=400)
+        #
+        # if payment_method_id:
+        #     try:
+        #         payment_method_obj = PaymentMethod.retrieve(payment_method_id,)
+        #     except:
+        #         return JsonResponse({"status": "No Payment found"}, status=404)
+        # else:
+        #     payment_method_obj = PaymentMethod.create(
+        #         type="card",
+        #         card={
+        #             "number": card_number,
+        #             "exp_month": card_exp_month,
+        #             "exp_year": card_exp_year,
+        #             "cvc": card_cvc,
+        #         },
+        #     )
+        #
+        # customer_data = Customer.list(email=email).data
+        #
+        # extra_msg = ""
+        # # if the array is empty it means the email has not been used yet
+        # if len(customer_data) == 0:
+        #     # creating customer
+        #     customer = Customer.create(
+        #     email=email, payment_method=payment_method_obj.id, invoice_settings={
+        #     'default_payment_method': payment_method_obj.id
+        # })
+        #
+        # else:
+        #     customer = customer_data[0]
+        #     extra_msg = "Customer already existed."
+        #
+        # ss = Subscription.create(
+        #     customer=customer,
+        #     items=[
+        #         {
+        #             'price': 'price_1IId2OBBdPclVL6EeTfyry3v'  # Premium Plan
+        #         }
+        #     ]
+        # )
+        me = get_user_by_token(request.META)
+        if me is None:
+            return JsonResponse({'status': 'Invalid token'}, status=404)
+        me.premium = True
+        me.save()
+        # return JsonResponse({'status': 'PREMIUM OK', 'customer_id': customer.id, 'subscription_id': ss.id, 'extra_message': extra_msg}, status=200)
+        return JsonResponse({'status': 'PREMIUM OK'}, status=200)
 
 
 class LoginView(APIView):
-
     def post(self, request):
         try:
             username = ""
@@ -380,7 +378,6 @@ class UsersListView(APIView):
             # changes in interests and etc.
             final_data['interests'] = str_to_list(final_data['interests'])
             return JsonResponse(final_data, status=200)
-
         try:
             reqGen = data['reqGender']
             reqGen = True if reqGen == "true" else False
@@ -389,22 +386,25 @@ class UsersListView(APIView):
         minterests = str_to_list(me.interests)
         if not minterests:
             return JsonResponse({'status': 'YOUR INTERESTS EMPTY'}, status=405)
+        try:
+            age_range = int(data['age_range'])
+        except KeyError:
+            age_range = 100
         if me.premium_days_left > 0:
             try:
                 with_interests = True if data['with_interests'] == "true" else False
             except KeyError:
                 with_interests = False
             try:
-                final_data = UserGetSerializer(get_user_by_interests_PREMIUM(minterests, reqGen, me, with_interests), many=False, context={'request': request}).data
+                final_data = UserGetSerializer(get_user_by_interests_PREMIUM(minterests, age_range, reqGen, me, with_interests), many=False, context={'request': request}).data
                 # changes in interests and etc.
                 final_data['interests'] = str_to_list(final_data['interests'])
                 return JsonResponse(final_data, status=200)
             except MyUser.DoesNotExist:
                 return JsonResponse({'status': 'No User Found'}, status=500)
-
         if not me.users_searched_day <= 5:
             try:
-                final_data = UserGetSerializer(get_user_by_interests(minterests, reqGen, me), many=False, context={'request': request}).data
+                final_data = UserGetSerializer(get_user_by_interests(age_range, reqGen, me), many=False, context={'request': request}).data
                 # changes in interests and etc.
                 final_data['interests'] = str_to_list(final_data['interests'])
                 return JsonResponse(final_data, status=200)
@@ -446,7 +446,7 @@ class FriendsListView(APIView):
         me_user = get_user_by_token(request.META)
         if me_user is None:
             return JsonResponse({'status': 'Invalid token'}, status=404)
-        serializer = FriendsListSerializer(me_user.friends.all(), many=True, context={'request': request})
+        serializer = FriendsListSerializer(me_user)
         return JsonResponse(serializer.data, safe=False, status=200)
 
     def delete(self, request):
@@ -587,8 +587,8 @@ class DateView(APIView):
         if me is None:
             return JsonResponse({'status': 'Invalid token'}, status=404)
         if me.premium_days_left <= 0:
-            if me.users_requested_date_day > 2:
-                return JsonResponse({'status': 'More than limit 2'}, status=406)
+            if me.users_requested_date_day > 1:
+                return JsonResponse({'status': 'More than limit 1'}, status=406)
         try:
             with_who = MyUser.objects.get(username=data["with"])
         except:

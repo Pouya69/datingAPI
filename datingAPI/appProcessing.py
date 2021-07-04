@@ -169,22 +169,21 @@ def get_user_random(me):
             return randomed
 
 
-def get_user_by_interests(interests, genderR, me):
+def get_user_by_interests(age_range, genderR, me):
     tries = 0
     while True:
         tries += 1
         if tries >= 10:
             raise MyUser.DoesNotExist
-        for interest in interests:
-            r = random.choice(MyUser.objects.filter(gender=genderR, status=False))
-            if r not in me.friends.all() and not r == me:
-                if interest in str_to_list(r.interests):
-                    me.users_searched_day += 1
-                    me.save()
-                    return r
+        r = random.choice(MyUser.objects.filter(gender=genderR, status=False))
+        if r not in me.friends.all() and not r == me:
+            if abs(r.age - me.age) <= age_range:
+                me.users_searched_day += 1
+                me.save()
+                return r
 
 
-def get_user_by_interests_PREMIUM(interests, genderR, me, with_interests):
+def get_user_by_interests_PREMIUM(interests, age_range, genderR, me, with_interests):
     tries = 0
     while True:
         tries += 1
@@ -193,13 +192,14 @@ def get_user_by_interests_PREMIUM(interests, genderR, me, with_interests):
         for interest in interests:
             r = random.choice(MyUser.objects.filter(gender=genderR, status=False))
             if not r == me and r not in me.friends.all():
-                if with_interests:
-                    if interest in str_to_list(r.interests):
-                        me.users_searched_day += 1
-                        me.save()
+                if abs(r.age - me.age) <= age_range:
+                    if with_interests:
+                        if interest in str_to_list(r.interests):
+                            me.users_searched_day += 1
+                            me.save()
+                            return r
+                    else:
                         return r
-                else:
-                    return r
 
 
 def date_notification(data):

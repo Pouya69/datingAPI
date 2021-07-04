@@ -20,6 +20,16 @@ class User1Test(APITestCase):
         self.assertEqual(response.status_code, 200)
 
         data = {
+            "email": "test@gmail.com",
+            "username": "pouyad_ai2",
+            "password": "Pooya1274406641@",
+            "age": 25,
+            "gender": "male"
+        }
+        response = self.client.post(path=f"{self.url}/api/register", data=data, format='json')
+        self.assertEqual(response.status_code, 200)
+
+        data = {
             "username": "catfish_2",
             "email": "pouya.psalehi@gmail.com",
             "password": "Pooya1274406641@",
@@ -280,4 +290,16 @@ class User1Test(APITestCase):
         self.assertEqual(Date.objects.all().count(), 0)
 
     def test_find_users(self):  # TODO
-        pass
+        data = {
+            'interests': ["piano", "gta", "cat"]
+        }
+        response = self.client.put(path=f"{self.url}/api/interests", data=data, format='json')
+        json_response = response.json()
+        self.assertEqual(data, json_response)
+        self.client.credentials(HTTP_AUTHORIZATION=f"token {self.token_2}")  # Go to other user
+        data = {
+            'interests': ["piano", "dog", "another"]  # One interests is same
+        }
+        response = self.client.put(path=f"{self.url}/api/interests", data=data, format='json')
+        json_response = response.json()
+        self.assertEqual(data, json_response)

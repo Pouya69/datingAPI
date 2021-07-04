@@ -129,7 +129,6 @@ class GroupListView(APIView):
     def put(self, request, chat_id=None):
         data = JSONParser().parse(request)
         me = get_user_by_token(request.META)
-        extra_message = ""
         if not chat_id:
             return JsonResponse({'status': 'Invalid chat_id'}, status=404)
         if me is None:
@@ -159,7 +158,6 @@ class GroupListView(APIView):
                     except MyUser.DoesNotExist:
                         # return JsonResponse({'status': 'Users not valid'}, status=404)
                         pass
-                extra_message = "Users added!"
             except:
                 pass
         elif command == "leave_group":
@@ -233,6 +231,13 @@ class GroupListView(APIView):
             if group.owner == me:
                 group.delete()
                 return JsonResponse({'status': 'DELETED'}, status=200)
+            me.chat_list.remove(group)
+            group.users.remove(me)
+            if me in group.admins:
+                group.admins.remove(me)
+            me.save()
+            group.save()
+            return JsonResponse({'status': 'LEFT GROUP'}, status=200)
         elif command == "remove_user":
             try:
                 if me not in group.admins.all():
