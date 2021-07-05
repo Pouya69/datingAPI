@@ -16,6 +16,7 @@ urlpatterns = [
 
     path('premium', views.PremiumBuyView.as_view(), name='premiumbuy'),
 
+    path('block', views.BlockUser.as_view(), name='BlockUserview'),
 
     path('findUser/<str:username>', views.UsersListView.as_view(), name='userGET'),  # For GET one User
     path('findUser', views.UsersListView.as_view(), name='user'),  # For GET Users and POST

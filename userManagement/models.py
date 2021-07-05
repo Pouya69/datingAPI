@@ -71,6 +71,7 @@ class MyUser(AbstractBaseUser):
     is_verified = models.BooleanField(default=False)
     interests = models.CharField(default="[]", max_length=50)
     chat_list = models.ManyToManyField('myapp.Group', related_name='users_chat_list', default=None)
+    block_list = models.ManyToManyField('self', related_name='blocked_users_list', default=None)
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
 

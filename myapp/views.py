@@ -96,6 +96,7 @@ class GroupListView(APIView):
             return JsonResponse(final_data, safe=False)
         groups = me.chat_list.all()
         final_data = GroupSerializer(groups, many=True, context={'request': request}).data
+        final_data['last_message'] = str_to_dict(final_data['last_message'])
         # Edit last message etc.
         return JsonResponse(final_data)
 
@@ -104,18 +105,20 @@ class GroupListView(APIView):
         me = get_user_by_token(request.META)
         if me is None:
             return JsonResponse({'status': 'Invalid token'}, status=404)
-        data_users = data['users']
-
-        group = Group(owner=me)
-        group.save()
-        for u_username in data_users:
-            try:
-                user = MyUser.objects.get(username=u_username)
-                print(user)
-                group.users.add(user)
-            except MyUser.DoesNotExist:
-                group.delete()
-                return JsonResponse({"status": "User not exists GROUP POST"}, status=404)
+        try:
+            data_users = data['users']
+            group = Group(owner=me)
+            group.save()
+            for u_username in data_users:
+                try:
+                    user = MyUser.objects.get(username=u_username)
+                    print(user)
+                    group.users.add(user)
+                except MyUser.DoesNotExist:
+                    group.delete()
+                    return JsonResponse({"status": "User not exists GROUP POST"}, status=404)
+        except:
+            return JsonResponse({"status": "Error in user lists"}, status=500)
         group.save()
         # print(group.owner)
         group.admins.add(me)

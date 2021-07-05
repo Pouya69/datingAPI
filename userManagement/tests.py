@@ -2,7 +2,6 @@ from rest_framework.test import APITestCase
 
 from myapp.models import Date
 from .models import MyUser, VerifyLink
-from rest_framework.authtoken.models import Token
 
 
 class User1Test(APITestCase):
@@ -45,6 +44,10 @@ class User1Test(APITestCase):
         self.assertEqual(response.status_code, 200)
 
         link = self.url + '/activate/' + VerifyLink.objects.get(user=MyUser.objects.get(username="catfish_2")).token
+        response = self.client.get(path=link, format='json')
+        self.assertEqual(response.status_code, 200)
+
+        link = self.url + '/activate/' + VerifyLink.objects.get(user=MyUser.objects.get(username="pouyad_ai2")).token
         response = self.client.get(path=link, format='json')
         self.assertEqual(response.status_code, 200)
 
@@ -92,6 +95,21 @@ class User1Test(APITestCase):
         print(f"profile me: {json_response}")
         self.assertEqual(response.status_code, 200)
         self.assertNotEqual({}, json_response)
+
+    def test_block_user(self):
+        data = {
+            'user_username': "catfish_2"
+        }
+
+        response = self.client.post(path=f"{self.url}/api/block", data=data, format='json')
+        self.assertEqual(response.status_code, 201)
+
+        response = self.client.get(path=f"{self.url}/api/block", format='json')
+        json_response = response.json()
+        self.assertEqual(json_response['block_list'], [{'username': "catfish_2"}])
+
+        response = self.client.delete(path=f"{self.url}/api/block", data=data, format='json')
+        self.assertEqual(response.status_code, 201)
 
     def test_interests(self):
         data = {

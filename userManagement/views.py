@@ -11,7 +11,9 @@ from django.contrib.auth import authenticate
 from PIL import Image
 from rest_framework.parsers import FileUploadParser, MultiPartParser
 from .models import MyUser, VerifyLink                                         # Our Message model
-from .serializers import LoginUserSerializer, UpdateUserSerializer, FriendsListSerializer, PictureSerializer, InterestsSerializer, FeelingsSerializer, UserSerializer, UserGetSerializer, VerifySerializer, VerifyUserSerializer # Our Serializer Classes
+from .serializers import LoginUserSerializer, UpdateUserSerializer, FriendsListSerializer, PictureSerializer, \
+    InterestsSerializer, FeelingsSerializer, UserSerializer, UserGetSerializer, VerifySerializer, VerifyUserSerializer, \
+    BlockListSerializer  # Our Serializer Classes
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -469,7 +471,7 @@ class FriendsListView(APIView):
         if friend_user not in me_user.friends.all():
             return JsonResponse({"status": "USER NOT IN FRIENDS"}, status=405)
         me_user.friends.remove(friend_user)
-        if not delete_date == "":
+        if not delete_date == "":  # means OK. Delete date also
             if me_user.dating_with is not None:
                 if friend_user.username == me_user.dating_with.username:
                     me_user.dating_with = None
@@ -539,7 +541,7 @@ class RefreshToken(APIView):
         data = JSONParser().parse(request)
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({"status": "Invalid Token"}, status=404)
+            return JsonResponse({"status": "Invalid Token"}, status=403)
         try:
             password = data["password"]
         except KeyError:
@@ -558,12 +560,64 @@ class RefreshToken(APIView):
             return JsonResponse({'status': 'INVALID CREDENTIALS3'}, status=404)
 
 
+class BlockUser(APIView):
+    authentication_classes = [authentication.TokenAuthentication]
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        data = JSONParser().parse(request)
+        me = get_user_by_token(request.META)
+        if me is None:
+            return JsonResponse({"status": "Invalid Token"}, status=403)
+        try:
+            user = MyUser.objects.get(username=data['user_username'])
+        except:
+            return JsonResponse({'status': 'User Not Found'}, status=404)
+        if user in me.friends.all():
+            me.friends.remove(user)
+            user.friends.remove(me)
+        if me.dating_with == user:
+            me.dating_with = None
+            user.dating_with = None
+            try:
+                Date.objects.filter(users__in=[me]).get(users__in=[user]).delete()
+            except:
+                pass
+        me.block_list.add(user)
+        me.save()
+        user.save()
+        return JsonResponse({'status': 'Blocked'}, status=201)
+
+    def delete(self, request):
+        data = JSONParser().parse(request)
+        me = get_user_by_token(request.META)
+        if me is None:
+            return JsonResponse({"status": "Invalid Token"}, status=403)
+        try:
+            user = MyUser.objects.get(username=data['user_username'])
+        except:
+            return JsonResponse({'status': 'User Not Found'}, status=404)
+        if user in me.block_list.all():
+            me.block_list.remove(user)
+        me.save()
+        return JsonResponse({'status': 'Unblocked'}, status=201)
+
+    def get(self, request):
+        me = get_user_by_token(request.META)
+        if me is None:
+            return JsonResponse({"status": "Invalid Token"}, status=403)
+        serializer = BlockListSerializer(me)
+        return JsonResponse(serializer.data, safe=False, status=200)
+
+
 class DateView(APIView):
     authentication_classes = [authentication.TokenAuthentication]
     permission_classes = (IsAuthenticated,)
 
     def get(self, request, date_id=None):
         me = get_user_by_token(request)
+        if me is None:
+            return JsonResponse({'status': 'Invalid token'}, status=403)
         if date_id:
             try:
                 date = Date.objects.get(date_id=date_id)
@@ -572,7 +626,7 @@ class DateView(APIView):
             if me in date.users.all():
                 serializer = DateSerializer(date, many=False, context={'request': request})
                 return JsonResponse(serializer.data, safe=False)
-            return JsonResponse({'status': 'ACCESS DENIED'}, safe=False)
+            return JsonResponse({'status': 'ACCESS DENIED'}, safe=False, status=405)
         # date = Date.objects.filter(users__in=[me], allowed=True)
         dates = Date.objects.filter(creator=me)  # Only the ones that I have sent requests to. others are secret :D
         serializer = DateSerializer(dates, many=True, context={'request': request})
@@ -585,7 +639,7 @@ class DateView(APIView):
         except KeyError:
             return JsonResponse({'status': 'Invalid token'}, status=404)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=404)
+            return JsonResponse({'status': 'Invalid token'}, status=403)
         if me.premium_days_left <= 0:
             if me.users_requested_date_day > 1:
                 return JsonResponse({'status': 'More than limit 1'}, status=406)

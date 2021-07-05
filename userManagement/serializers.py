@@ -22,11 +22,14 @@ class UpdateUserSerializer(serializers.ModelSerializer):
         model = MyUser
         fields = ['username', 'email', 'about']
 
+
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
+
     class Meta:
         model = MyUser
         fields = '__all__'
+
 
 class UserSerializerName(serializers.ModelSerializer):
     username = serializers.CharField()
@@ -42,6 +45,15 @@ class FriendsListSerializer(serializers.ModelSerializer):
     class Meta:
         model = MyUser
         fields = ['friends']
+
+
+class BlockListSerializer(serializers.ModelSerializer):
+    block_list = UserSerializerName(many=True, read_only=True)
+
+    class Meta:
+        model = MyUser
+        fields = ['block_list']
+
 
 # User Serializer
 class PictureSerializer(serializers.ModelSerializer):
