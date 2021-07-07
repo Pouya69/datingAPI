@@ -40,7 +40,7 @@ class Message(models.Model):
     group_id      = models.ForeignKey(Group, related_name="id_of_chat", on_delete=models.CASCADE, blank=False, null=False, max_length=20)
     creator       = models.ForeignKey(MyUser, related_name="sender_user", on_delete=models.CASCADE, blank=False)
     replying_to   = models.ForeignKey(MyUser, related_name="replied_user", on_delete=models.CASCADE, default=None)
-    file_url      = models.FileField(upload_to='chat/', default=None, null=True, blank=True)
+    file_url      = models.TextField(default="", null=True, blank=True)
     content       = models.TextField(default="", max_length=3300)
     created_at    = models.DateTimeField(auto_now_add=True)
     is_received   = models.BooleanField(default=False)
@@ -48,6 +48,10 @@ class Message(models.Model):
 
     def __str__(self):
         return self.id
+
+
+class FileMessage(models.Model):
+    file_file = models.FileField(upload_to='chat/', default=None, null=True, blank=True)
 
 
 class Date(models.Model):

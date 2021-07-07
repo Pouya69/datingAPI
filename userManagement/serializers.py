@@ -9,8 +9,17 @@ class UserGetSerializer(serializers.ModelSerializer):
         fields = ['age', 'gender', 'username', 'about', 'dating_with', 'feeling', 'interests']
 
 
+class UserSerializerName(serializers.ModelSerializer):
+    username = serializers.CharField()
+
+    class Meta:
+        model = MyUser
+        fields = ['username']
+
+
 # User Serializer
 class LoginUserSerializer(serializers.ModelSerializer):
+    dating_with = UserSerializerName(many=False, read_only=True)
     """For Serializing User"""
     class Meta:
         model = MyUser
@@ -31,12 +40,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class UserSerializerName(serializers.ModelSerializer):
-    username = serializers.CharField()
 
-    class Meta:
-        model = MyUser
-        fields = ['username']
 
 
 class FriendsListSerializer(serializers.ModelSerializer):

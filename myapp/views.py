@@ -5,13 +5,15 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.parsers import JSONParser
 from datingAPI.appProcessing import *
+import re
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import authentication
 from PIL import Image
 from rest_framework.parsers import FileUploadParser, MultiPartParser
-from .models import Message, Group, Date                                         # Our Message model
-from .serializers import GroupPictureSerializer, MessageSerializer, DateSerializer, GroupSerializer # Our Serializer Classes
+from .models import Message, Group, Date, FileMessage  # Our Message model
+from .serializers import GroupPictureSerializer, MessageSerializer, DateSerializer, \
+    GroupSerializerAdmins, GroupSerializerGET, GroupSerializerIdChat  # Our Serializer Classes
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -51,11 +53,13 @@ class FileUploadMessage(APIView):
             return JsonResponse({'status': 'Invalid Token'}, status=404)
         try:
             file = request.FILES["file"]
-            if file.size > (10 * (1024 * 1024)):
-                return JsonResponse({'status': 'File Size more than 10 MB'}, status=403)
-            msg = Message.objects.get(id=int(data['message_id']))
-            msg.file_url.save(file.name, file, save=True)
-            msg.save()  # Here if error
+            if file.size > (15 * (1024 * 1024)):
+                return JsonResponse({'status': 'File Size more than 15 MB'}, status=403)
+            file_message_model = FileMessage()
+            file_message_model.save()
+            file_message_model.file_file.save(file.name, file, save=True)
+            file_message_model.save()  # Here if error
+            return JsonResponse({'download_url': get_download_link_from_file(file_message_model.file_file)}, status=200)
         except:
             return JsonResponse({'status': 'File Error'}, status=500)
 
@@ -70,7 +74,7 @@ def join_chat(request, chat_id=None):
             group = Group.objects.get(id=int(chat_id))
         except:
             return JsonResponse({'status': 'Invalid Group'}, status=404)
-        if group not in me.chat_list.all():
+        if group not in me.chat_list.all() and me not in group.users.all():
             group.join_chat(me)
             me.chat_list.add(group)
             return JsonResponse({'status': 'Joined Group'}, status=200)
@@ -85,26 +89,26 @@ class GroupListView(APIView):
     def get(self, request, chat_id=None):
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=404)
+            return JsonResponse({'status': 'Invalid token'}, status=403)
         if chat_id:
             try:
                 group = Group.objects.get(id_chat=chat_id)
             except Group.DoesNotExist:
                 return JsonResponse({'status': 'Invalid chat_id'}, status=404)
-            final_data = GroupSerializer(group, many=False, context={'request': request}).data
-            # Edit last message etc.
-            return JsonResponse(final_data, safe=False)
-        groups = me.chat_list.all()
-        final_data = GroupSerializer(groups, many=True, context={'request': request}).data
+            if me not in group.users.all():
+                return JsonResponse({'status': 'You are not in the group'}, status=405)
+            final_data = GroupSerializerGET(group, many=False, context={'request': request}).data
+            final_data['last_message'] = str_to_dict(final_data['last_message'])
+            return JsonResponse(final_data, status=200)
+        final_data = GroupSerializerGET(me.chat_list.all(), many=True, context={'request': request}).data
         final_data['last_message'] = str_to_dict(final_data['last_message'])
-        # Edit last message etc.
-        return JsonResponse(final_data)
+        return JsonResponse(final_data, status=200)
 
     def post(self, request):
         data = JSONParser().parse(request)
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=404)
+            return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
             data_users = data['users']
             group = Group(owner=me)
@@ -112,22 +116,24 @@ class GroupListView(APIView):
             for u_username in data_users:
                 try:
                     user = MyUser.objects.get(username=u_username)
-                    print(user)
+                    if me in user.block_list.all():
+                        return JsonResponse({'status': f'You are blocked by {user.username}'}, status=410)
                     group.users.add(user)
                 except MyUser.DoesNotExist:
                     group.delete()
-                    return JsonResponse({"status": "User not exists GROUP POST"}, status=404)
+                    return JsonResponse({"status": "User not exists GROUP POST"}, status=503)
         except:
             return JsonResponse({"status": "Error in user lists"}, status=500)
         group.save()
-        # print(group.owner)
         group.admins.add(me)
         group.users.add(me)
         for u in group.users.all():
             u.chat_list.add(group)
-        serializer = GroupSerializer(group, many=False, context={'request': request})
-        return JsonResponse(serializer.data, status=200)
-        # TESTED
+            u.save()
+        group.save()
+        final_data = GroupSerializerGET(group, many=False, context={'request': request}).data
+        # final_data['last_message'] = str_to_dict(final_data['last_message'])
+        return JsonResponse(final_data, status=200)
 
     def put(self, request, chat_id=None):
         data = JSONParser().parse(request)
@@ -152,37 +158,39 @@ class GroupListView(APIView):
             return JsonResponse({'status': 'No Commands'}, status=404)
         if command == "add_users":
             try:
-                users_add = data["add_users"]
+                users_add = data["users"]
                 for add_username in users_add:
                     try:
                         user_user = MyUser.objects.get(username=add_username)
+                        if user_user == me:
+                            return JsonResponse({'status': 'You are the user'}, status=402)
+                        if me in user_user.block_list.all():
+                            return JsonResponse({'status': 'You are blocked'}, status=410)
                         if not user_user not in users:
                             group.users.add(user_user)
+                            group.save()
+                            final_data = GroupSerializerAdmins(group, many=False, context={'request': request}).data
+                            # final_data['last_message'] = str_to_dict(final_data['last_message'])
+                            return JsonResponse(final_data, status=200)
                     except MyUser.DoesNotExist:
-                        # return JsonResponse({'status': 'Users not valid'}, status=404)
-                        pass
+                        return JsonResponse({'status': 'User not vaild : {add_username}'}, status=404)
             except:
-                pass
-        elif command == "leave_group":
-            if group.owner == me:
-                group.delete()
-                return JsonResponse({'status': 'DELETED'}, status=200)
-            me.chat_list.remove(group)
-            group.users.remove(me)
-            if me in group.admins:
-                group.admins.remove(me)
-            me.save()
-            group.save()
-            return JsonResponse({'status': 'LEFT GROUP'}, status=200)
-        elif me not in admins:
+                return JsonResponse({'status': f'Users not vaild'}, status=404)
+        if me not in admins:
             return JsonResponse({'status': 'NOT ADMIN'}, status=403)
-        if command == "new_chat_id":
+        elif command == "new_chat_id":
             try:
-                new_id = data["new_id_chat"]
+                new_id = data["id_chat"]
                 if not new_id == "" and new_id is not None:
-                    group.id_chat = new_id
+                    if not re.match("^[a-z0-9_]*$", new_id):
+                        return JsonResponse({"status": "Invalid characters in chat id"}, status=408)
+                    serializer = GroupSerializerIdChat(group, data)
+                    if serializer.is_valid():
+                        serializer.save()
+                    else:
+                        return JsonResponse(serializer.errors, status=406)
             except KeyError:
-                pass
+                return JsonResponse({'status': 'No chat id provided'}, status=404)
         elif command == "new_owner":
             try:
                 new_owner_username = data["new_owner"]
@@ -197,22 +205,26 @@ class GroupListView(APIView):
                         group.save()
                         return JsonResponse({'status': 'You are not the owner'}, status=403)
             except KeyError:
-                pass
+                return JsonResponse({'status': 'No owner provided'}, status=404)
         elif command == "new_admins":
             try:
                 new_admins = data["new_admins"]
                 for admin_username in new_admins:
                     try:
                         user_admin = MyUser.objects.get(username=admin_username)
-                        if user_admin not in admins:
+                        if user_admin not in admins and not user_admin == me:
                             group.admins.add(user_admin)
+                        else:
+                            return JsonResponse({'status': 'Admin add error'}, status=405)
                     except MyUser.DoesNotExist:
                         group.save()
                         return JsonResponse({'status': 'Admins not valid'}, status=404)
-            except KeyError:
-                pass
+            except:
+                return JsonResponse({'status': 'No admins provided'}, status=404)
         group.save()
-        return JsonResponse("UPDATED", status=200)
+        final_data = GroupSerializerAdmins(group, many=False, context={'request': request}).data
+        # final_data['last_message'] = str_to_dict(final_data['last_message'])
+        return JsonResponse(final_data, status=200)
 
     def delete(self, request, chat_id=None):
         data = JSONParser().parse(request)
@@ -249,13 +261,17 @@ class GroupListView(APIView):
                 if user == me:
                     return JsonResponse({'status': 'Cannot remove self'}, status=403)
                 if user == group.owner:
-                    return JsonResponse({'status': 'Cannot remove admin'}, status=403)
+                    return JsonResponse({'status': 'Cannot remove owner'}, status=403)
+                if me == group.owner:
+                    if user in group.admins:
+                        group.admins.remove(user)
+                else:
+                    if user in group.admins:
+                        return JsonResponse({'status': 'Cannot remove admin'}, status=406)
                 group.users.remove(user)
-                if user in group.admins:
-                    group.admins.remove(user)
                 group.save()
             except:
-                return JsonResponse({'status': 'Error'}, status=406)
+                return JsonResponse({'status': 'Error'}, status=500)
 
 
 # U should also have a request handler for deleting the admins and users.
@@ -268,7 +284,7 @@ class GroupPictureView(APIView):
         data = json.loads(request.data["data"])
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({"status": "Invalid Token"}, status=404)
+            return JsonResponse({"status": "Invalid Token"}, status=403)
         try:
             gr = Group.objects.get(id=data["group_id"])
             if me not in gr.admins:
@@ -295,7 +311,8 @@ class GroupPictureView(APIView):
             try:
                 gr = Group.objects.get(id=group_id)
                 serializer = GroupPictureSerializer(gr, many=False, context={'request': request})
-                return JsonResponse(serializer.data, safe=False, status = 200)
+                serializer.data['group_img'] = get_download_link_from_file(serializer.data['group_img'])
+                return JsonResponse(serializer.data, status=200)
             except Group.DoesNotExist:
                 return JsonResponse({'status': 'USER NOT EXISTS'}, status = 404)
         else:

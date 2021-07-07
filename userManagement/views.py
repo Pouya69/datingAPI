@@ -161,11 +161,17 @@ class RegisterView(APIView):
             try:
                 data['age'] = int(data['age'])
             except:
-                return JsonResponse({"status": "AGE ERROR"}, status=500)
+                return JsonResponse({"status": "AGE ERROR"}, status=406)
             if not check_age(data['age']):
                 return JsonResponse({'status': "AGE NOT ALLOWED"}, status=405)
-            if not re.match("^[a-z0-9_]*$", data['username']):
-                return JsonResponse({"status": "Invalid characters in username"}, status=402)
+            try:
+                if not re.match("^[a-z0-9_]*$", data['username']):
+                    return JsonResponse({"status": "Invalid characters in username"}, status=402)
+                regexx = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+                if not re.match(regexx, data['email']):
+                    return JsonResponse({"status": "Invalid characters in email"}, status=402)
+            except:
+                return JsonResponse({"status": "ERROR"}, status=500)
             serializer = UserSerializer(data=data)
             if serializer.is_valid():
                 serializer.save()
@@ -276,6 +282,8 @@ class InterestsView(APIView):
         if username:
             try:
                 userr = MyUser.objects.get(username=username)
+                if me in userr.block_list.all():
+                    return JsonResponse({'status': 'You are blocked'}, status=410)
                 mList = str_to_list(userr.interests)
                 mydic = {}
                 mydic['interests'] = mList
@@ -299,6 +307,8 @@ class FeelingsView(APIView):
         if username:
             try:
                 usr = MyUser.objects.get(username=username)
+                if me in usr.block_list.all():
+                    return JsonResponse({'status': 'You are blocked'}, status=410)
                 serializer = FeelingsSerializer(usr, many=False, context={'request': request})
                 return JsonResponse(serializer.data, status=200)
             except MyUser.DoesNotExist:
@@ -359,7 +369,7 @@ class ProfilePictureView(APIView):
         else:
             serializer = PictureSerializer(me, many=False, context={'request': request})
             serializer.data['profile_pic'] = get_download_link_from_file(serializer.data['profile_pic'])
-            return JsonResponse(serializer.data, status = 200)
+            return JsonResponse(serializer.data, status=200)
 
 
 class UsersListView(APIView):
@@ -425,7 +435,7 @@ class FriendsListView(APIView):
     authentication_classes = [authentication.TokenAuthentication]
     permission_classes = (IsAuthenticated,)
 
-    def put(self, request):
+    def put(self, request):  # We will send the notifications in the client side
         data = JSONParser().parse(request)
         me_user = get_user_by_token(request.META)
         if me_user is None:
@@ -438,6 +448,8 @@ class FriendsListView(APIView):
             userModel = MyUser.objects.get(username=username)
         except MyUser.DoesNotExist:
             return JsonResponse({'status': 'User does not exists'}, status=404)
+        if me_user in userModel.block_list.all():
+            return JsonResponse({'status': 'You are blocked'}, status=410)
         if userModel in me_user.friends.all() and userModel is me_user:
             return JsonResponse({'status': 'ALREADY EXISTS'}, status=400)
         me_user.friends.add(userModel)
@@ -521,6 +533,14 @@ class ProfileMeView(APIView):
             me = get_user_by_token(request.META)
             if me is None:
                 return JsonResponse({"status": "Invalid Token"}, status=403)
+            try:
+                regexx = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+                if not re.match("^[a-z0-9_]*$", data['username']):
+                    return JsonResponse({"status": "Invalid characters in username"}, status=402)
+                if not re.match(regexx, data['email']):
+                    return JsonResponse({"status": "Invalid characters in email"}, status=402)
+            except KeyError:
+                return JsonResponse({"status": "ERROR"}, status=500)
             serializer = UpdateUserSerializer(me, data=data)
             if serializer.is_valid():
                 serializer.save()
@@ -560,7 +580,7 @@ class RefreshToken(APIView):
             return JsonResponse({'status': 'INVALID CREDENTIALS3'}, status=404)
 
 
-class BlockUser(APIView):
+class BlockUser(APIView):  # Check this with views always. Messages, groups, date, friend add etc.
     authentication_classes = [authentication.TokenAuthentication]
     permission_classes = (IsAuthenticated,)
 
@@ -649,6 +669,8 @@ class DateView(APIView):
             return JsonResponse({'status': 'User not found'}, status=404)
         if with_who is me:
             return JsonResponse({'status': 'Error'}, status=500)
+        if me in with_who.block_list.all():
+            return JsonResponse({'status': 'You are blocked'}, status=410)
         if me.dating_with or with_who.dating_with:
             return JsonResponse({'status': 'Already dating'}, status=402)
         try:

@@ -8,7 +8,7 @@ from time import sleep as sleep_time
 from rest_framework.authtoken.models import Token
 from myapp.models import Message,Group, Date                                         # Our Message model
 from userManagement.models import MyUser, VerifyLink
-from myapp.serializers import MessageSerializer, DateSerializer, GroupSerializer # Our Serializer Classes
+from myapp.serializers import MessageSerializer, DateSerializer, GroupSerializerAdmins, GroupSerializerGET # Our Serializer Classes
 from userManagement.serializers import PictureSerializer, InterestsSerializer, FeelingsSerializer, UserSerializer, \
     VerifySerializer, VerifyUserSerializer, UserGetSerializer
 import smtplib
