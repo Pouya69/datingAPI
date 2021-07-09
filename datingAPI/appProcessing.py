@@ -4,10 +4,13 @@ import random
 import uuid
 import json
 import os
+from datetime import timedelta
 from time import sleep as sleep_time
+
+from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from myapp.models import Message,Group, Date                                         # Our Message model
-from userManagement.models import MyUser, VerifyLink
+from userManagement.models import MyUser, VerifyLink, Story
 from myapp.serializers import MessageSerializer, DateSerializer, GroupSerializerAdmins, GroupSerializerGET # Our Serializer Classes
 from userManagement.serializers import PictureSerializer, InterestsSerializer, FeelingsSerializer, UserSerializer, \
     VerifySerializer, VerifyUserSerializer, UserGetSerializer
@@ -39,6 +42,14 @@ def init_tasks2():
         MyUser.objects.all().update(users_requested_date_day=0, users_searched_day=0)
         # print("Resetting date requests and search requests!")
         sleep_time(86400)
+
+
+def init_tasks3():
+    while True:
+        for story in Story.objects.all():
+            if story.timestamp + timedelta(days=1) < timezone.now():
+                story.delete()
+        sleep_time(300)
 
 
 def encrypt(data):
@@ -150,8 +161,7 @@ def email_link(email_user,link):
 def get_user_by_token(req_meta):
     try:
         auth_token = str(req_meta["HTTP_AUTHORIZATION"]).replace("token ", "")
-        s = Token.objects.get(key=auth_token)
-        return s.user
+        return Token.objects.get(key=auth_token).user
     except:
         return None
 
@@ -163,7 +173,7 @@ def get_user_random(me):
         if tries >= 10:
             raise MyUser.DoesNotExist
         randomed = random.choice(MyUser.objects.all())
-        if not randomed == me and randomed not in me.friends.all():
+        if not randomed == me and randomed not in me.friends.all() and me not in randomed.block_list.all() and randomed is not me.dating_with:
             me.users_searched_day += 1
             me.save()
             return randomed
@@ -175,12 +185,12 @@ def get_user_by_interests(age_range, genderR, me):
         tries += 1
         if tries >= 10:
             raise MyUser.DoesNotExist
-        r = random.choice(MyUser.objects.filter(gender=genderR, status=False))
-        if r not in me.friends.all() and not r == me:
-            if abs(r.age - me.age) <= age_range:
+        randomed = random.choice(MyUser.objects.filter(gender=genderR, status=False))
+        if not randomed == me and randomed not in me.friends.all() and me not in randomed.block_list.all() and randomed is not me.dating_with:
+            if abs(randomed.age - me.age) <= age_range:
                 me.users_searched_day += 1
                 me.save()
-                return r
+                return randomed
 
 
 def get_user_by_interests_PREMIUM(interests, age_range, genderR, me, with_interests):
@@ -190,16 +200,16 @@ def get_user_by_interests_PREMIUM(interests, age_range, genderR, me, with_intere
         if tries >= 10:
             raise MyUser.DoesNotExist
         for interest in interests:
-            r = random.choice(MyUser.objects.filter(gender=genderR, status=False))
-            if not r == me and r not in me.friends.all():
-                if abs(r.age - me.age) <= age_range:
+            randomed = random.choice(MyUser.objects.filter(gender=genderR, status=False))
+            if not randomed == me and randomed not in me.friends.all() and me not in randomed.block_list.all() and randomed is not me.dating_with:
+                if abs(randomed.age - me.age) <= age_range:
                     if with_interests:
-                        if interest in str_to_list(r.interests):
+                        if interest in str_to_list(randomed.interests):
                             me.users_searched_day += 1
                             me.save()
-                            return r
+                            return randomed
                     else:
-                        return r
+                        return randomed
 
 
 def date_notification(data):

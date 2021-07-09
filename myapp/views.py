@@ -55,6 +55,11 @@ class FileUploadMessage(APIView):
             file = request.FILES["file"]
             if file.size > (15 * (1024 * 1024)):
                 return JsonResponse({'status': 'File Size more than 15 MB'}, status=403)
+            try:
+                if me not in Group.objects.get(id=data['group_id']).users.all():
+                    return JsonResponse({'status': 'You cannot access the group'}, status=407)
+            except Group.DoesNotExist:
+                return JsonResponse({'status': 'Group Access Error'}, status=404)
             file_message_model = FileMessage()
             file_message_model.save()
             file_message_model.file_file.save(file.name, file, save=True)
@@ -166,6 +171,8 @@ class GroupListView(APIView):
                             return JsonResponse({'status': 'You are the user'}, status=402)
                         if me in user_user.block_list.all():
                             return JsonResponse({'status': 'You are blocked'}, status=410)
+                        if me not in user_user.friends.all() or user_user not in me.friends.all():
+                            return JsonResponse({'status': 'You are not friends'}, status=407)
                         if not user_user not in users:
                             group.users.add(user_user)
                             group.save()

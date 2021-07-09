@@ -2,6 +2,12 @@ from django.db import models
 from django.contrib.auth.models import (
     BaseUserManager, AbstractBaseUser
 )
+import os
+
+class Story(models.Model):
+    clip = models.FileField(upload_to='stories/', null=False, blank=False)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    # expire_date = timezone.now() + datetime.timedelta(days=1)
 
 
 class MyUserManager(BaseUserManager):
@@ -53,7 +59,7 @@ class MyUser(AbstractBaseUser):
         max_length=255
     )
     age = models.IntegerField(blank=False)
-    profile_pic = models.ImageField(upload_to = 'pics/', default='/defaults/no-img.jpeg')
+    profile_pic = models.ImageField(upload_to = 'pics/', blank=True, null=True, default=None)
     gender = models.BooleanField(default=True)
     premium_days_left = models.IntegerField(default=0)
     username = models.CharField(blank=False, unique=True, max_length=15)
@@ -72,6 +78,8 @@ class MyUser(AbstractBaseUser):
     interests = models.CharField(default="[]", max_length=50)
     chat_list = models.ManyToManyField('myapp.Group', related_name='users_chat_list', default=None)
     block_list = models.ManyToManyField('self', related_name='blocked_users_list', default=None)
+    private = models.BooleanField(default=False)
+    stories = models.ManyToManyField(Story, related_name='story_list', default=None)
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
 
@@ -79,6 +87,17 @@ class MyUser(AbstractBaseUser):
 
     USERNAME_FIELD = 'username'
     REQUIRED_FIELDS = ['age', 'gender', 'email']
+
+    def remove_old_profile_pic(self):
+        if self.profile_pic:
+            s = self.profile_pic.path
+            print(f"L: {self.profile_pic.path}")
+            self.profile_pic.delete()
+            self.profile_pic = None
+
+    def add_story(self, story):
+        self.stories.add(story)
+        self.save()
 
     def __str__(self):
         return str(self.username) or ""

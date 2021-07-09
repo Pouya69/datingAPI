@@ -4,13 +4,14 @@ import threading
 from . import views
 
 from datingAPI import appProcessing
+
 urlpatterns = [
     path('login', views.LoginView.as_view(), name='login'),  # For POST login a user
     path('logout', views.LogoutView.as_view(), name='logout'),  # For POST logout a user
     path('register', views.RegisterView.as_view(), name='register'),  # For POST register a user
     path('refreshToken', views.RefreshToken.as_view(), name='refreshToken'),
     path('verifyAgain', views.sendVerifyLinkAgain, name='verifyAgain'),
-    
+
     path('friends', views.FriendsListView.as_view(), name='friendss'),
     path('friends/<str:user_id>', views.FriendsListView.as_view(), name='friends'),
 
@@ -20,7 +21,10 @@ urlpatterns = [
 
     path('findUser/<str:username>', views.UsersListView.as_view(), name='userGET'),  # For GET one User
     path('findUser', views.UsersListView.as_view(), name='user'),  # For GET Users and POST
-    
+
+    path('story', views.StoryView.as_view(), name='putStory'),
+    path('story/<str:story_id>', views.StoryView.as_view(), name='deleteStory'),
+    path('story/<str:username>', views.StoryView.as_view(), name='getStory'),
 
     path('profile', views.ProfileMeView.as_view(), name='meProfile'),  # For POST and PUT and GET user details
 
@@ -38,6 +42,9 @@ urlpatterns = [
 
 init_thread = threading.Thread(target=appProcessing.init_tasks, name="initer")
 init_thread.start()
+
+init_thread3 = threading.Thread(target=appProcessing.init_tasks3, name="initer")
+init_thread3.start()
 
 init_thread2 = threading.Thread(target=appProcessing.init_tasks2, name="initer2")
 init_thread2.start()

@@ -10,10 +10,12 @@ from rest_framework import authentication
 from django.contrib.auth import authenticate
 from PIL import Image
 from rest_framework.parsers import FileUploadParser, MultiPartParser
-from .models import MyUser, VerifyLink                                         # Our Message model
+from .models import MyUser, VerifyLink, Story  # Our Message model
 from .serializers import LoginUserSerializer, UpdateUserSerializer, FriendsListSerializer, PictureSerializer, \
     InterestsSerializer, FeelingsSerializer, UserSerializer, UserGetSerializer, VerifySerializer, VerifyUserSerializer, \
     BlockListSerializer  # Our Serializer Classes
+import cv2
+
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -284,6 +286,9 @@ class InterestsView(APIView):
                 userr = MyUser.objects.get(username=username)
                 if me in userr.block_list.all():
                     return JsonResponse({'status': 'You are blocked'}, status=410)
+                if userr.private is True:
+                    if me not in userr.friends.all():
+                        return JsonResponse({'status': 'You are not in their friend list. private account'}, status=406)
                 mList = str_to_list(userr.interests)
                 mydic = {}
                 mydic['interests'] = mList
@@ -294,6 +299,77 @@ class InterestsView(APIView):
         mydic = {'interests': mList}
         return JsonResponse(mydic, status=200)
 # TESTED
+
+
+class StoryView(APIView):  # TODO : Test this
+    authentication_classes = [authentication.TokenAuthentication]
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request, username=None):
+        me = get_user_by_token(request.META)
+        if me is None:
+            return JsonResponse({'status': 'Invalid token'}, status=403)
+        if username:
+            try:
+                usr = MyUser.objects.get(username=username)
+            except MyUser.DoesNotExist:
+                return JsonResponse({'status': 'username not exists'}, status=404)
+            if me in usr.block_list.all():
+                return JsonResponse({'status': 'You are blocked'}, status=410)
+            if usr.private is True:
+                if me not in usr.friends.all():
+                    return JsonResponse({'status': 'You are not in their friend list. private account'}, status=406)
+            final_data = {'stories': {}}
+            for story in me.stories.all():
+                final_data['stories'][story.id] = get_download_link_from_file(story)
+            return JsonResponse(final_data, status=200)
+
+    def put(self, request):
+        me = get_user_by_token(request.META)
+        if me is None:
+            return JsonResponse({'status': 'Invalid token'}, status=403)
+        try:
+            f = request.FILES["file"]
+        except:
+            return JsonResponse({"status": "ERROR FILE"}, status=500)
+        if f.size > (8 * (1024 * 1024)):
+            return JsonResponse({'status': 'File Size more than 6 MB'}, status=405)
+        try:
+            video = cv2.VideoCapture(f)
+            frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
+            fps = int(video.get(cv2.CAP_PROP_FPS))
+            seconds = int(frames / fps)
+            if seconds > 10:
+                return JsonResponse({'status': 'Video more than 10 seconds'}, status=406)
+            story = Story()
+            story.save()
+            story.clip.save(f.name, f, save=True)
+            story.save()
+            me.add_story(story)
+            return JsonResponse({'status': 'SUCCESS UPLOAD'}, status=200)
+        except:
+            try:
+                img = Image.open(f)
+                img.verify()
+                story = Story()
+                story.save()
+                story.clip.save(f.name, f, save=True)
+                story.save()
+                me.add_story(story)
+                return JsonResponse({'status': 'SUCCESS UPLOAD'}, status=200)
+            except:
+                return JsonResponse({"status": "Unsupported image type"}, status=401)
+
+    def delete(self, request, story_id=None):
+        me = get_user_by_token(request.META)
+        if me is None:
+            return JsonResponse({'status': 'Invalid token'}, status=403)
+        if story_id:
+            story = Story.objects.get(id=int(story_id))
+            me.stories.remove(story)
+            story.delete()
+            me.save()
+            return JsonResponse({'status': 'Story deleted'}, status=201)
 
 
 class FeelingsView(APIView):
@@ -309,10 +385,13 @@ class FeelingsView(APIView):
                 usr = MyUser.objects.get(username=username)
                 if me in usr.block_list.all():
                     return JsonResponse({'status': 'You are blocked'}, status=410)
+                if usr.private is True:
+                    if me not in usr.friends.all():
+                        return JsonResponse({'status': 'You are not in their friend list. private account'}, status=406)
                 serializer = FeelingsSerializer(usr, many=False, context={'request': request})
                 return JsonResponse(serializer.data, status=200)
             except MyUser.DoesNotExist:
-                return JsonResponse({'status': 'username not exists'}, status=400)
+                return JsonResponse({'status': 'username not exists'}, status=404)
         serializer = FeelingsSerializer(me, many=False, context={'request': request})
         return JsonResponse(serializer.data, status=200)
 
@@ -327,6 +406,9 @@ class FeelingsView(APIView):
             return JsonResponse(serializer.data, status=200)
         return JsonResponse(serializer.errors, status=404)
 # TESTED
+
+
+# TODO : Delete full profile
 
 
 class ProfilePictureView(APIView):
@@ -345,6 +427,7 @@ class ProfilePictureView(APIView):
         if f.size > (6 * (1024 * 1024)):
             return JsonResponse({'status': 'File Size more than 6 MB'}, status=405)
         try:
+            me.remove_old_profile_pic()
             img = Image.open(f)
             img.verify()
             me.profile_pic.save(f.name, f, save=True)
@@ -386,6 +469,11 @@ class UsersListView(APIView):
                 user = MyUser.objects.get(username=username)
             except MyUser.DoesNotExist:
                 return JsonResponse({'status': 'USER NOT EXISTS'}, status=404)
+            if me in user.block_list.all():
+                return JsonResponse({'status': 'You are blocked'}, status=410)
+            if user.private is True:
+                if me not in user.friends.all():
+                    return JsonResponse({'status': 'You are not in their friend list. private account'}, status=406)
             final_data = UserGetSerializer(user, many=False, context={'request': request}).data
             # changes in interests and etc.
             final_data['interests'] = str_to_list(final_data['interests'])
@@ -541,6 +629,10 @@ class ProfileMeView(APIView):
                     return JsonResponse({"status": "Invalid characters in email"}, status=402)
             except KeyError:
                 return JsonResponse({"status": "ERROR"}, status=500)
+            try:
+                data['private'] = True if data['private'] == 'true' else False
+            except KeyError:
+                return JsonResponse({"status": "ERROR"}, status=404)
             serializer = UpdateUserSerializer(me, data=data)
             if serializer.is_valid():
                 serializer.save()

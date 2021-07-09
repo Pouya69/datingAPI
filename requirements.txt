@@ -8,7 +8,6 @@ dj-stripe==2.4.3
 Django==3.0.5
 django-rest-framework==0.1.0
 djangorestframework==3.12.2
-djongo==1.3.4
 filelock==3.0.12
 geomet==0.2.1.post1
 idna==2.10
@@ -16,7 +15,6 @@ jsonfield==3.1.0
 mongoengine==0.23.0
 Pillow==8.1.2
 psycopg2==2.8.6
-pymongo==3.11.3
 pytz==2021.1
 requests==2.25.1
 six==1.15.0

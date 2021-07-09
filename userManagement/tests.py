@@ -137,6 +137,12 @@ class User1Test(APITestCase):
         with open('userManagement/image_test.jpg', 'rb') as image:
             response = self.client.put(path=f"{self.url}/api/profilePic", data={'file': image})
             self.assertEqual(response.status_code, 200)
+        with open('userManagement/image_test.jpg', 'rb') as image:
+            response = self.client.put(path=f"{self.url}/api/profilePic", data={'file': image})
+            self.assertEqual(response.status_code, 200)
+        with open('userManagement/image_test.jpg', 'rb') as image:
+            response = self.client.put(path=f"{self.url}/api/profilePic", data={'file': image})
+            self.assertEqual(response.status_code, 200)
         response = self.client.get(path=f"{self.url}/api/profilePic")
         self.assertEqual(response.status_code, 200)
         json_response = response.json()
