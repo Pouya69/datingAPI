@@ -26,7 +26,7 @@ urlpatterns = [
     path('story/<str:story_id>', views.StoryView.as_view(), name='deleteStory'),
     path('story/<str:username>', views.StoryView.as_view(), name='getStory'),
 
-    path('profile', views.ProfileMeView.as_view(), name='meProfile'),  # For POST and PUT and GET user details
+    path('profile', views.ProfileMeView.as_view(), name='meProfile'),  # For POST and PUT and GET user details and also delete user
 
     path('interests', views.InterestsView.as_view(), name='interestsUSER'),
     path('interests/<str:username>', views.InterestsView.as_view(), name='interestsUSEROTHER'),

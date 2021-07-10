@@ -91,7 +91,7 @@ def check_age_date(me, other):
 
 def check_age(age):
     try:
-        if age >= 16:
+        if age >= 18:
             return True
         return False
     except:

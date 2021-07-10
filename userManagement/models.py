@@ -56,7 +56,10 @@ class MyUserManager(BaseUserManager):
 class MyUser(AbstractBaseUser):
     id = models.BigAutoField(primary_key=True, unique=True)
     email = models.EmailField(
-        max_length=255
+        max_length=255,
+        unique=True,
+        null=False,
+        blank=False
     )
     age = models.IntegerField(blank=False)
     profile_pic = models.ImageField(upload_to = 'pics/', blank=True, null=True, default=None)

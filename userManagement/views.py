@@ -328,29 +328,22 @@ class StoryView(APIView):  # TODO : Test this
         me = get_user_by_token(request.META)
         if me is None:
             return JsonResponse({'status': 'Invalid token'}, status=403)
+        data = JSONParser().parse(request)
         try:
             f = request.FILES["file"]
         except:
             return JsonResponse({"status": "ERROR FILE"}, status=500)
         if f.size > (8 * (1024 * 1024)):
             return JsonResponse({'status': 'File Size more than 6 MB'}, status=405)
-        try:
-            video = cv2.VideoCapture(f)
-            frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
-            fps = int(video.get(cv2.CAP_PROP_FPS))
-            seconds = int(frames / fps)
-            if seconds > 10:
-                return JsonResponse({'status': 'Video more than 10 seconds'}, status=406)
-            story = Story()
-            story.save()
-            story.clip.save(f.name, f, save=True)
-            story.save()
-            me.add_story(story)
-            return JsonResponse({'status': 'SUCCESS UPLOAD'}, status=200)
-        except:
+        story_type = data['story_type']
+        if story_type == "video":
             try:
-                img = Image.open(f)
-                img.verify()
+                video = cv2.VideoCapture(f)
+                frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
+                fps = int(video.get(cv2.CAP_PROP_FPS))
+                seconds = int(frames / fps)
+                if seconds > 10:
+                    return JsonResponse({'status': 'Video more than 10 seconds'}, status=406)
                 story = Story()
                 story.save()
                 story.clip.save(f.name, f, save=True)
@@ -358,7 +351,18 @@ class StoryView(APIView):  # TODO : Test this
                 me.add_story(story)
                 return JsonResponse({'status': 'SUCCESS UPLOAD'}, status=200)
             except:
-                return JsonResponse({"status": "Unsupported image type"}, status=401)
+                return JsonResponse({'status': 'Video Error'}, status=406)
+        try:
+            img = Image.open(f)
+            img.verify()
+            story = Story()
+            story.save()
+            story.clip.save(f.name, f, save=True)
+            story.save()
+            me.add_story(story)
+            return JsonResponse({'status': 'SUCCESS UPLOAD'}, status=200)
+        except:
+            return JsonResponse({"status": "Unsupported image type"}, status=401)
 
     def delete(self, request, story_id=None):
         me = get_user_by_token(request.META)
@@ -406,9 +410,6 @@ class FeelingsView(APIView):
             return JsonResponse(serializer.data, status=200)
         return JsonResponse(serializer.errors, status=404)
 # TESTED
-
-
-# TODO : Delete full profile
 
 
 class ProfilePictureView(APIView):
@@ -642,7 +643,23 @@ class ProfileMeView(APIView):
             return JsonResponse({"status": "Not Found"}, status=404)
         except:
             return JsonResponse({"status": "BAD"}, status=500)
-    # TEST THIS ONE HERE
+
+    def delete(self, request):  # Delete the whole profile
+        me = get_user_by_token(request.META)
+        if me is None:
+            return JsonResponse({"status": "Invalid Token"}, status=403)
+        data = JSONParser().parse(request)
+        try:
+            username = data['username']
+            password = data['password']
+            user = MyUser.objects.get(username=username)
+            if not user == me:
+                return JsonResponse({"status": "User from token is not the same with user in credentials"}, status=405)
+            if not user.check_password(password):
+                return JsonResponse({'status': "Invalid credentials"}, status=404)
+            user.delete()
+        except:
+            return JsonResponse({'status': "Invalid credentials"}, status=404)
 
 
 class RefreshToken(APIView):
