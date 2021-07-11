@@ -207,7 +207,7 @@ class User1Test(APITestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_friends(self):
-        response = self.client.get(path=f"{self.url}/api/friends", format='json')
+        response = self.client.get(path=f"{self.url}/api/friends", data={'type': "friends"}, format='json')
         json_response = response.json()
         print(f"friends get: {json_response}")
         self.assertEqual(response.status_code, 200)
@@ -218,7 +218,7 @@ class User1Test(APITestCase):
         response = self.client.put(path=f"{self.url}/api/friends", data=data, format='json')
         self.assertEqual(response.status_code, 200)  # Then send notification to add friend back
 
-        response = self.client.get(path=f"{self.url}/api/friends", format='json')
+        response = self.client.get(path=f"{self.url}/api/friends", data={'type': "friends"}, format='json')
         json_response = response.json()
         print(f"friends get 2: {json_response}")
         self.assertEqual(response.status_code, 200)

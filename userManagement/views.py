@@ -565,9 +565,22 @@ class FriendsListView(APIView):
     def get(self, request):
         me_user = get_user_by_token(request.META)
         if me_user is None:
-            return JsonResponse({'status': 'Invalid token'}, status=404)
-        serializer = FriendsListSerializer(me_user)
-        return JsonResponse(serializer.data, safe=False, status=200)
+            return JsonResponse({'status': 'Invalid token'}, status=403)
+        data = JSONParser().parse(request)
+        try:
+            what = data['type']
+        except KeyError:
+            return JsonResponse({'status': 'No Types'}, status=404)
+        if what == "friends":
+            serializer = FriendsListSerializer(me_user)
+            return JsonResponse(serializer.data, safe=False, status=200)
+        elif what == "friend_requests":
+            final_data = {}
+            users = MyUser.objects.filter(friends__in=me_user)
+            for user in users:
+                if user not in me_user.friends.all():
+                    final_data['friend_requests'] = user.username
+            return JsonResponse(final_data, status=200)
 
     def delete(self, request):
         data = JSONParser().parse(request)
