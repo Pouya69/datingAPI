@@ -4,6 +4,7 @@ from django.contrib.auth.models import (
 )
 import os
 
+
 class Story(models.Model):
     clip = models.FileField(upload_to='stories/', null=False, blank=False)
     timestamp = models.DateTimeField(auto_now_add=True)

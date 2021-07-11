@@ -20,12 +20,12 @@ import base64
 # headers = {'Authorization': 'Token 9054f7aa9305e012b3c2300408c3dfdf390fcddf'}
 
 site_link = "127.0.0.1:8000/"
-
+site_link_media = "127.0.0.1:8000"
 
 def get_download_link_from_file(file):
     try:
         # download_link = f"{site_link}/{file.path}"
-        return file.url
+        return f"{site_link_media}{file.url}"
     except:
         return ""
 

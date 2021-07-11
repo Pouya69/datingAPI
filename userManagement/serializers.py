@@ -23,13 +23,13 @@ class LoginUserSerializer(serializers.ModelSerializer):
     """For Serializing User"""
     class Meta:
         model = MyUser
-        fields = ['email', 'age', 'gender', 'username', 'about', 'dating_with', 'feeling', 'interests', 'premium_days_left']
+        fields = ['email', 'age', 'gender', 'username', 'about', 'dating_with', 'feeling', 'interests', 'premium_days_left', 'private']
 
 
 class UpdateUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = MyUser
-        fields = ['username', 'email', 'about']
+        fields = ['username', 'email', 'about', 'private']
 
 
 class UserSerializer(serializers.ModelSerializer):

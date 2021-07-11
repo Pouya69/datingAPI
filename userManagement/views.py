@@ -14,7 +14,7 @@ from .models import MyUser, VerifyLink, Story  # Our Message model
 from .serializers import LoginUserSerializer, UpdateUserSerializer, FriendsListSerializer, PictureSerializer, \
     InterestsSerializer, FeelingsSerializer, UserSerializer, UserGetSerializer, VerifySerializer, VerifyUserSerializer, \
     BlockListSerializer  # Our Serializer Classes
-import cv2
+from moviepy.editor import VideoFileClip
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -301,7 +301,7 @@ class InterestsView(APIView):
 # TESTED
 
 
-class StoryView(APIView):  # TODO : Test this
+class StoryView(APIView):
     authentication_classes = [authentication.TokenAuthentication]
     permission_classes = (IsAuthenticated,)
 
@@ -320,43 +320,60 @@ class StoryView(APIView):  # TODO : Test this
                 if me not in usr.friends.all():
                     return JsonResponse({'status': 'You are not in their friend list. private account'}, status=406)
             final_data = {'stories': {}}
+            for story in usr.stories.all():
+                final_data['stories'][story.id] = get_download_link_from_file(story.clip)
+            return JsonResponse(final_data, status=200)
+        else:
+            final_data = {'stories': {}}
             for story in me.stories.all():
-                final_data['stories'][story.id] = get_download_link_from_file(story)
+                final_data['stories'][story.id] = get_download_link_from_file(story.clip)
             return JsonResponse(final_data, status=200)
 
-    def put(self, request):
+    def post(self, request):
         me = get_user_by_token(request.META)
         if me is None:
             return JsonResponse({'status': 'Invalid token'}, status=403)
-        data = JSONParser().parse(request)
+        try:
+            data = json.loads(request.POST['data'])
+        except:
+            return JsonResponse({'status': 'Bad Request'}, status=400)
         try:
             f = request.FILES["file"]
         except:
             return JsonResponse({"status": "ERROR FILE"}, status=500)
         if f.size > (8 * (1024 * 1024)):
             return JsonResponse({'status': 'File Size more than 6 MB'}, status=405)
-        story_type = data['story_type']
+        try:
+            story_type = data['story_type']
+        except KeyError:
+            return JsonResponse({'status': 'No Story Type'}, status=404)
         if story_type == "video":
+            story = Story()
             try:
-                video = cv2.VideoCapture(f)
-                frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
-                fps = int(video.get(cv2.CAP_PROP_FPS))
-                seconds = int(frames / fps)
-                if seconds > 10:
-                    return JsonResponse({'status': 'Video more than 10 seconds'}, status=406)
-                story = Story()
-                story.save()
                 story.clip.save(f.name, f, save=True)
                 story.save()
+                video = VideoFileClip(story.clip.path)
+                seconds = int(video.duration)
+                print(seconds)
+                if seconds > 10:
+                    video.close()
+                    story.clip.delete()
+                    story.delete()
+                    return JsonResponse({'status': 'Video more than 10 seconds'}, status=408)
+
                 me.add_story(story)
                 return JsonResponse({'status': 'SUCCESS UPLOAD'}, status=200)
             except:
+                try:
+                    story.clip.delete()
+                    story.delete()
+                except:
+                     pass
                 return JsonResponse({'status': 'Video Error'}, status=406)
         try:
             img = Image.open(f)
             img.verify()
             story = Story()
-            story.save()
             story.clip.save(f.name, f, save=True)
             story.save()
             me.add_story(story)
@@ -370,7 +387,7 @@ class StoryView(APIView):  # TODO : Test this
             return JsonResponse({'status': 'Invalid token'}, status=403)
         if story_id:
             story = Story.objects.get(id=int(story_id))
-            me.stories.remove(story)
+            story.clip.delete()
             story.delete()
             me.save()
             return JsonResponse({'status': 'Story deleted'}, status=201)

@@ -3,8 +3,9 @@ from django.urls import path
 import threading
 from . import views
 
-from datingAPI import appProcessing
-
+from datingAPI import appProcessing, settings
+import os
+from django.conf.urls.static import static
 urlpatterns = [
     path('login', views.LoginView.as_view(), name='login'),  # For POST login a user
     path('logout', views.LogoutView.as_view(), name='logout'),  # For POST logout a user
@@ -36,9 +37,12 @@ urlpatterns = [
     path('date', views.DateView.as_view(), name='datePUTPOST'),  # For Date POST and PUT
     path('profilePic', views.ProfilePictureView.as_view(), name='profilepicPOST'),  # For PUT
     path('profilePic/<str:username>', views.ProfilePictureView.as_view(), name='profilepic'),  # For GET
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 ## After Runserver
+dir = 'media/stories'
+for f in os.listdir(dir):
+    os.remove(os.path.join(dir, f))
 
 init_thread = threading.Thread(target=appProcessing.init_tasks, name="initer")
 init_thread.start()

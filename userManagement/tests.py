@@ -1,3 +1,6 @@
+import json
+import time
+
 from rest_framework.test import APITestCase
 
 from myapp.models import Date
@@ -12,7 +15,7 @@ class User1Test(APITestCase):
             "email": "pooyasalehi69@gmail.com",
             "username": "pouyad_ai",
             "password": "Pooya1274406641@",
-            "age": 17,
+            "age": 19,
             "gender": "male"
         }
         response = self.client.post(path=f"{self.url}/api/register", data=data, format='json')
@@ -89,12 +92,35 @@ class User1Test(APITestCase):
         json_response = response.json()
         self.assertEqual("happy", json_response['feeling'])
 
-    def test_profile_me_data(self):  # TODO (about, username, email)
+    def test_profile_me_data(self):
         response = self.client.get(path=f"{self.url}/api/profile", format='json')
         json_response = response.json()
         print(f"profile me: {json_response}")
         self.assertEqual(response.status_code, 200)
         self.assertNotEqual({}, json_response)
+
+    def test_change_profile_data(self):
+        data = {
+            'username': "pouyad_ai8",
+            'email': "pouya.psalehi@gmail.com",
+            'about': "I just changed my bio",
+            'private': 'true'
+        }
+        response = self.client.put(path=f"{self.url}/api/profile", data=data, format='json')
+        json_response = response.json()
+        print(f"Error: {json_response}")
+        self.assertEqual(response.status_code, 400)
+
+        data = {
+            'username': "pouyad_ai8",
+            'email': "pouyaaa.psalehi@gmail.com",
+            'about': "I just changed my bio",
+            'private': 'true'
+        }
+        response = self.client.put(path=f"{self.url}/api/profile", data=data, format='json')
+        json_response = response.json()
+        print(f"Profile Update Good: {json_response}")
+        self.assertEqual(response.status_code, 200)
 
     def test_block_user(self):
         data = {
@@ -327,3 +353,47 @@ class User1Test(APITestCase):
         response = self.client.put(path=f"{self.url}/api/interests", data=data, format='json')
         json_response = response.json()
         self.assertEqual(data, json_response)
+
+    def test_stories(self):  # TODO
+        response = self.client.get(path=f"{self.url}/api/story")
+        json_response = response.json()
+        self.assertEqual(json_response, {'stories': {}})
+
+        with open('userManagement/image_test.jpg', 'rb') as image:
+            dd = json.dumps({
+                'story_type': "image"
+            })
+            data = {
+                'file': image,
+                'data': dd
+            }
+            response = self.client.post(path=f"{self.url}/api/story", data=data)
+            json_response = response.json()
+            self.assertEqual(response.status_code, 200)
+
+        with open('userManagement/testvideo.mp4', 'rb') as video:
+            dd = json.dumps({
+                'story_type': "video"
+            })
+            data = {
+                'file': video,
+                'data': dd
+            }
+            response = self.client.post(path=f"{self.url}/api/story", data=data)
+            json_response = response.json()
+            self.assertEqual(response.status_code, 200)
+        with open('userManagement/test2.mp4', 'rb') as video2:  # TODO
+            dd = json.dumps({
+                'story_type': "video"
+            })
+            data = {
+                'file': video2,
+                'data': dd
+            }
+            response = self.client.post(path=f"{self.url}/api/story", data=data)
+            json_response = response.json()
+            self.assertEqual(response.status_code, 408)
+        response = self.client.get(path=f"{self.url}/api/story")
+        self.assertEqual(response.status_code, 200)
+        json_response = response.json()
+        print(f"Stories new : {json_response}")  # Print the image download link
