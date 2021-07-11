@@ -4,9 +4,10 @@ from rest_framework import serializers
 
 #Login Serializer
 class UserGetSerializer(serializers.ModelSerializer):
+    create_date = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%S", required=False, read_only=True)
     class Meta:
         model = MyUser
-        fields = ['age', 'gender', 'username', 'about', 'dating_with', 'feeling', 'interests']
+        fields = ['age', 'gender', 'username', 'about', 'dating_with', 'feeling', 'interests', 'create_date']
 
 
 class UserSerializerName(serializers.ModelSerializer):
@@ -20,10 +21,11 @@ class UserSerializerName(serializers.ModelSerializer):
 # User Serializer
 class LoginUserSerializer(serializers.ModelSerializer):
     dating_with = UserSerializerName(many=False, read_only=True)
+    create_date = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%S", required=False, read_only=True)
     """For Serializing User"""
     class Meta:
         model = MyUser
-        fields = ['email', 'age', 'gender', 'username', 'about', 'dating_with', 'feeling', 'interests', 'premium_days_left', 'private']
+        fields = ['email', 'age', 'gender', 'username', 'about', 'dating_with', 'feeling', 'interests', 'premium_days_left', 'private', 'create_date']
 
 
 class UpdateUserSerializer(serializers.ModelSerializer):
