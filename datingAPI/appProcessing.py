@@ -252,7 +252,23 @@ def generateLink(user):
         p.delete()
     except VerifyLink.DoesNotExist:
         pass
-    VerifyLink.objects.create(token=tok, user=user)
+    VerifyLink.objects.create(token=tok, user=user, verify_type="register")
+    ## EMAIL THE LINK
+    #try:
+        #email_link(user.email, mLink)
+    #except:
+        #print('Less Secure Apps Gmail')
+
+
+def generateLinkConfirm(user, newEmail):
+    tok = str(uuid.uuid4())
+    mLink = site_link + 'activate/' + tok
+    try:
+        p = VerifyLink.objects.get(user=user)
+        p.delete()
+    except VerifyLink.DoesNotExist:
+        pass
+    VerifyLink.objects.create(token=tok, user=user, verify_type="email", extra_data=newEmail)
     ## EMAIL THE LINK
     #try:
         #email_link(user.email, mLink)

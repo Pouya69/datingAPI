@@ -10,10 +10,13 @@ urlpatterns = [
     path('login', views.LoginView.as_view(), name='login'),  # For POST login a user
     path('logout', views.LogoutView.as_view(), name='logout'),  # For POST logout a user
     path('register', views.RegisterView.as_view(), name='register'),  # For POST register a user
-    path('refreshToken', views.RefreshToken.as_view(), name='refreshToken'),
+    path('google', views.GoogleView.as_view(), name='google'),  # add path for google authentication
+
+    path('refreshToken', views.RefreshTokenn.as_view(), name='refreshToken'),
     path('verifyAgain', views.sendVerifyLinkAgain, name='verifyAgain'),
 
     path('friends', views.FriendsListView.as_view(), name='friendss'),
+    path('friends/<str:request_type>', views.FriendsListView.as_view(), name='friendsGET'),
     path('friends/<str:user_id>', views.FriendsListView.as_view(), name='friends'),
 
     path('premium', views.PremiumBuyView.as_view(), name='premiumbuy'),

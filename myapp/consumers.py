@@ -30,7 +30,7 @@ def messages_to_json(messages):
     return result
 
 
-class ChatConsumer(AsyncWebsocketConsumer):
+class ChatConsumer(AsyncWebsocketConsumer):  # TODO: Check if user is looking at the chat
     async def connect(self):
         # The user gets in the chat page so it means he/she is looking.
         self.room_name = self.scope['url_route']['kwargs']['room_name']

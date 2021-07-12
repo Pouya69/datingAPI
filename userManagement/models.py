@@ -67,12 +67,11 @@ class MyUser(AbstractBaseUser):
     gender = models.BooleanField(default=True)
     premium_days_left = models.IntegerField(default=0)
     username = models.CharField(blank=False, unique=True, max_length=15)
-    friends = models.ManyToManyField('self', default=None)
+    friends = models.ManyToManyField('MyUser', default=None)
     subscription_id_stripe = models.TextField(default="")
+    account_type = models.CharField(default="", max_length=10)
     customer_id_stripe = models.TextField(default="")
-    followers = models.ManyToManyField('self', default=None)
-    following = models.ManyToManyField('self', default=None)
-    dating_with = models.ForeignKey('self', related_name="dating_with_user", on_delete=models.CASCADE, blank=True, null=True)
+    dating_with = models.ForeignKey('MyUser', related_name="dating_with_user", on_delete=models.CASCADE, blank=True, null=True)
     users_searched_day = models.IntegerField(default=0)
     users_requested_date_day = models.IntegerField(default=0)
     feeling = models.CharField(default="nothing", max_length=15)
@@ -81,7 +80,7 @@ class MyUser(AbstractBaseUser):
     is_verified = models.BooleanField(default=False)
     interests = models.CharField(default="[]", max_length=50)
     chat_list = models.ManyToManyField('myapp.Group', related_name='users_chat_list', default=None)
-    block_list = models.ManyToManyField('self', related_name='blocked_users_list', default=None)
+    block_list = models.ManyToManyField('MyUser', related_name='blocked_users_list', default=None)
     private = models.BooleanField(default=False)
     stories = models.ManyToManyField(Story, related_name='story_list', default=None)
     is_active = models.BooleanField(default=True)
@@ -126,6 +125,8 @@ class MyUser(AbstractBaseUser):
 class VerifyLink(models.Model):
     token = models.TextField(blank=False, primary_key=True)
     user = models.ForeignKey(MyUser, related_name='register_user', on_delete=models.CASCADE)
+    verify_type = models.CharField(max_length=10, default="")
+    extra_data = models.TextField(default="")
 
     def __str__(self):
         return self.token

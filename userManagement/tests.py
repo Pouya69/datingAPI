@@ -1,5 +1,4 @@
 import json
-import time
 
 from rest_framework.test import APITestCase
 
@@ -38,9 +37,21 @@ class User1Test(APITestCase):
             "age": 18,
             "gender": "female"
         }
-
         response = self.client.post(path=f"{self.url}/api/register", data=data, format='json')
         self.assertEqual(response.status_code, 200)
+
+        data = {
+            'username': "pouyacat34",
+            "age": 18,
+            "gender": "female",
+            # Each time get a token from google auth api https://developers.google.com/oauthplayground/  with value : https://www.googleapis.com/auth/userinfo.email
+            'token': "ya29.a0ARrdaM9D5s_UMm6TdZivO1RA6aSCPvam0J0-h3QFKpMvpXbvMvrU59vhXg57u2XV2ODXMEBKzLz5rCI2MYJFBexcnEz7gHM_ZQINC6VGSROz05g2umVGdFS-kRJRt0YIsLBNLeXQ-juNOzX7P72dbB_c3QtB"
+        }
+        response = self.client.post(path=f"{self.url}/api/google", data=data, format='json')
+        json_response = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.token_4 = json_response['access_token']
+        # Bearer <Token>
 
         link = self.url + '/activate/' + VerifyLink.objects.get(user=MyUser.objects.get(username="pouyad_ai")).token
         response = self.client.get(path=link, format='json')
@@ -64,7 +75,6 @@ class User1Test(APITestCase):
         token = json_response['token']
         self.assertNotEqual(token, "")
         self.token_1 = token
-        self.client.credentials(HTTP_AUTHORIZATION=f"token {self.token_1}")
 
         data = {
             "email": "pouya.psalehi@gmail.com",
@@ -77,9 +87,24 @@ class User1Test(APITestCase):
         self.assertNotEqual(token, "")
         self.token_2 = token
 
+        data = {
+            "email": "test@gmail.com",
+            "password": "Pooya1274406641@"
+        }
+        response = self.client.post(path=f"{self.url}/api/login", data=data, format='json')
+        self.assertEqual(response.status_code, 200)
+        json_response = response.json()
+        token = json_response['token']
+        self.assertNotEqual(token, "")
+        self.token_3 = token
+        self.client.credentials(HTTP_AUTHORIZATION=f"token {self.token_1}")
+
+        # self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token_4}")  # For google is Bearer
+
     def test_feeling(self):
         response = self.client.get(path=f"{self.url}/api/feeling", format='json')
         json_response = response.json()
+        print(json_response)
         self.assertEqual("nothing", json_response['feeling'])
         data = {
             'feeling': 'happy'
@@ -207,21 +232,26 @@ class User1Test(APITestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_friends(self):
-        response = self.client.get(path=f"{self.url}/api/friends", data={'type': "friends"}, format='json')
+        response = self.client.get(path=f"{self.url}/api/friends/get_friends", format='json')
         json_response = response.json()
         print(f"friends get: {json_response}")
         self.assertEqual(response.status_code, 200)
 
         data = {
-            'user_username': 'catfish_2'
+            'user_username': "pouyacat34"
         }
         response = self.client.put(path=f"{self.url}/api/friends", data=data, format='json')
+        json_response = response.json()
         self.assertEqual(response.status_code, 200)  # Then send notification to add friend back
 
-        response = self.client.get(path=f"{self.url}/api/friends", data={'type': "friends"}, format='json')
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token_4}")  # Go to other user
+        response = self.client.get(path=f"{self.url}/api/friends/friend_requests", format='json')
         json_response = response.json()
         print(f"friends get 2: {json_response}")
         self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(json_response, {})
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"token {self.token_1}")  # Go to other user
 
         # Delete without dating
         response = self.client.delete(path=f"{self.url}/api/friends", data=data, format='json')
@@ -231,7 +261,7 @@ class User1Test(APITestCase):
         response = self.client.put(path=f"{self.url}/api/friends", data=data, format='json')
         self.assertEqual(response.status_code, 200)  # Then send notification to add friend back
         data = {
-            'with': "catfish_2",
+            'with': "pouyacat34",
             'type': "hidden"  # Crush
         }
         response = self.client.post(path=f"{self.url}/api/date", data=data, format='json')
@@ -241,12 +271,12 @@ class User1Test(APITestCase):
             'with': "pouyad_ai",
             'decision': "OK"
         }
-        self.client.credentials(HTTP_AUTHORIZATION=f"token {self.token_2}")  # Go to other user
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token_4}")  # Go to other user
         response = self.client.put(path=f"{self.url}/api/date", data=data, format='json')
         self.assertEqual(response.status_code, 200)
 
         data = {
-            'user_username': 'catfish_2',
+            'user_username': 'pouyacat34',
             'delete_date': 'OK'  # If user wants to delete the date while removing friend else nothing
         }
         self.client.credentials(HTTP_AUTHORIZATION=f"token {self.token_1}")  # Go to other user
@@ -254,7 +284,7 @@ class User1Test(APITestCase):
         self.assertEqual(response.status_code, 201)
 
         user_1 = MyUser.objects.get(username="pouyad_ai")
-        user_2 = MyUser.objects.get(username="catfish_2")
+        user_2 = MyUser.objects.get(username="pouyacat34")
         self.assertEqual(Date.objects.all().count(), 0)
         self.assertEqual(user_1.dating_with, None)
         self.assertEqual(user_2.dating_with, None)
@@ -266,7 +296,7 @@ class User1Test(APITestCase):
         response = self.client.put(path=f"{self.url}/api/friends", data=data, format='json')
         self.assertEqual(response.status_code, 200)  # Then send notification to add friend back
         data = {
-            'with': "catfish_2",
+            'with': "pouyacat34",
             'type': "hidden"  # Crush
         }
         response = self.client.post(path=f"{self.url}/api/date", data=data, format='json')
@@ -276,12 +306,12 @@ class User1Test(APITestCase):
             'with': "pouyad_ai",
             'decision': "OK"
         }
-        self.client.credentials(HTTP_AUTHORIZATION=f"token {self.token_2}")  # Go to other user
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token_4}")  # Go to other user
         response = self.client.put(path=f"{self.url}/api/date", data=data, format='json')
         self.assertEqual(response.status_code, 200)
 
         data = {
-            'user_username': 'catfish_2',
+            'user_username': 'pouyacat34',
             'delete_date': ""  # If user wants to delete the date while removing friend else nothing
         }
         self.client.credentials(HTTP_AUTHORIZATION=f"token {self.token_1}")  # Go to other user
@@ -289,7 +319,7 @@ class User1Test(APITestCase):
         self.assertEqual(response.status_code, 201)
 
         user_1 = MyUser.objects.get(username="pouyad_ai")
-        user_2 = MyUser.objects.get(username="catfish_2")
+        user_2 = MyUser.objects.get(username="pouyacat34")
         self.assertNotEqual(Date.objects.all().count(), 0)
         self.assertNotEqual(user_1.dating_with, None)
         self.assertNotEqual(user_2.dating_with, None)
@@ -297,19 +327,19 @@ class User1Test(APITestCase):
         self.assertEqual(Date.objects.filter(users__in=[user_1]).get(users__in=[user_1]).male, True)
 
         data = {
-            'with': "catfish_2",
+            'with': "pouyacat34",
         }
         response = self.client.delete(path=f"{self.url}/api/date", data=data, format='json')
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Date.objects.all().count(), 0)
         user_1 = MyUser.objects.get(username="pouyad_ai")
-        user_2 = MyUser.objects.get(username="catfish_2")
+        user_2 = MyUser.objects.get(username="pouyacat34")
         self.assertEqual(user_1.dating_with, None)
         self.assertEqual(user_2.dating_with, None)
 
     def test_dating(self):
         user_1 = MyUser.objects.get(username="pouyad_ai")
-        user_2 = MyUser.objects.get(username="catfish_2")
+        user_2 = MyUser.objects.get(username="pouyacat34")
         self.assertEqual(user_1.dating_with, None)
         self.assertEqual(user_2.dating_with, None)
 

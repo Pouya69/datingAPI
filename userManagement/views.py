@@ -1,7 +1,13 @@
 import re
+
+import requests
+from django.contrib.auth.base_user import BaseUserManager
+from django.contrib.auth.hashers import make_password
 from django.http.response import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.parsers import JSONParser
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import RefreshToken
 from stripe import Customer, Subscription, PaymentMethod
 from datingAPI.appProcessing import *
 from rest_framework.views import APIView
@@ -21,7 +27,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class PremiumBuyView(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
+    authentication_classes = [authentication.TokenAuthentication, JWTAuthentication]
     permission_classes = (IsAuthenticated,)
 
     def post(self, request):
@@ -172,6 +178,8 @@ class RegisterView(APIView):
                 regexx = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
                 if not re.match(regexx, data['email']):
                     return JsonResponse({"status": "Invalid characters in email"}, status=402)
+                if len(data['username']) < 5:
+                    return JsonResponse({"status": "username needs to be at least 5 characters long"}, status=402)
             except:
                 return JsonResponse({"status": "ERROR"}, status=500)
             serializer = UserSerializer(data=data)
@@ -179,6 +187,7 @@ class RegisterView(APIView):
                 serializer.save()
                 user = MyUser.objects.get(username=data['username'], email=data['email'])
                 user.set_password(str(data['password']))
+                user.account_type = "normal"
                 user.save()
                 # do some stuff
                 generateLink(user)
@@ -221,6 +230,64 @@ def sendVerifyLinkAgain(request):
             generateLink(me)
             return JsonResponse({'status': 'ANOTHER LINK'}, status=200)
 
+# TODO: Apple etc. also
+class GoogleView(APIView):
+    def post(self, request):
+        dataa = JSONParser().parse(request)
+        try:
+            payload = {'access_token': dataa['token']}  # validate the token
+        except KeyError:
+            return JsonResponse({'status': 'ERROR'}, status=500)
+        r = requests.get('https://www.googleapis.com/oauth2/v2/userinfo', params=payload)
+        data = json.loads(r.text)
+
+        if 'error' in data:
+            content = {'message': 'wrong google token / this google token is already expired.'}
+            return JsonResponse(content, status=404)
+
+        # create user if not exist
+        try:
+            user = MyUser.objects.get(email=data['email'])
+            if not user.account_type == "google":
+                return JsonResponse({"status": "Access Denied"}, status=406)
+        except KeyError:
+            return JsonResponse({"status": "Error"}, status=500)
+        except MyUser.DoesNotExist:
+            try:
+                if dataa['gender'] == 'male':
+                    gender = True
+                else:
+                    gender = False
+                age = int(dataa['age'])
+                if not check_age(age):
+                    return JsonResponse({'status': "AGE NOT ALLOWED"}, status=405)
+                user = MyUser()
+                user.email = data['email']
+                if not re.match("^[a-z0-9_]*$", dataa['username']):
+                    return JsonResponse({"status": "Invalid characters in username"}, status=402)
+                if len(dataa['username']) < 5:
+                    return JsonResponse({"status": "username needs to be at least 5 characters long"}, status=402)
+                user.username = dataa['username']
+                user.age = age
+                user.gender = gender
+                user.account_type = "google"
+                # provider random default password
+                user.is_verified = True  # No verification for Google users
+                user.set_password(make_password(BaseUserManager().make_random_password()))
+                user.save()
+            except:
+                return JsonResponse({"status": "Error"}, status=500)
+
+        token = RefreshToken.for_user(user)  # generate token without username & password
+        response = {}
+        serializer = LoginUserSerializer(user, many=False, context={'request': request})
+        final_data = serializer.data
+        final_data["interests"] = str_to_list(final_data["interests"])
+        response['user'] = final_data
+        response['access_token'] = str(token.access_token)
+        response['refresh_token'] = str(token)
+        return JsonResponse(response, status=200)
+
 
 # TESTED
 class VerifyView(APIView):
@@ -229,28 +296,35 @@ class VerifyView(APIView):
             # print(token)
             try:
                 p = VerifyLink.objects.get(token=token)
-                token_user = p.user
-                userp = MyUser.objects.get(username=token_user.username, email=token_user.email, age=token_user.age)
-                userp.is_verified = True
-                userp.save()
-                p.delete()
-                # Remeber to make response in HTML because they are using the browser!
-                return JsonResponse({'status': 'VERIFED'}, status=200)
             except VerifyLink.DoesNotExist:
                 return JsonResponse({'status': 'BAD-TOKEN'}, status=404)
+            token_user = p.user
+            userp = MyUser.objects.get(email=token_user.email)
+            if p.verify_type == "register":
+                userp.is_verified = True
+                userp.save()
+            else:  # Change email
+                userp.email = p.extra_data
+                userp.save()
+            p.delete()
+            # Remeber to make response in HTML because they are using the browser!
+            return JsonResponse({'status': 'VERIFED'}, status=200)
+
         else:
             return JsonResponse({'status': 'BAD TOKEN'}, status=404)
 # TESTED
 
 
 class LogoutView(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
+    authentication_classes = [authentication.TokenAuthentication, JWTAuthentication]
     permission_classes = (IsAuthenticated,)
 
     def post(self, request):
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({"status": "Invalid Token"}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
             p = Token.objects.get(user=me)
             p.delete()
@@ -260,14 +334,16 @@ class LogoutView(APIView):
 
 
 class InterestsView(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
+    authentication_classes = [authentication.TokenAuthentication, JWTAuthentication]
     permission_classes = (IsAuthenticated,)
 
     def put(self, request):
         data = JSONParser().parse(request)
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
             interests = list_to_str([str(i) for i in data['interests']])
         except:
@@ -280,7 +356,9 @@ class InterestsView(APIView):
     def get(self, request, username=None):
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=404)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         if username:
             try:
                 userr = MyUser.objects.get(username=username)
@@ -302,13 +380,15 @@ class InterestsView(APIView):
 
 
 class StoryView(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
+    authentication_classes = [authentication.TokenAuthentication, JWTAuthentication]
     permission_classes = (IsAuthenticated,)
 
     def get(self, request, username=None):
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         if username:
             try:
                 usr = MyUser.objects.get(username=username)
@@ -332,7 +412,9 @@ class StoryView(APIView):
     def post(self, request):
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
             data = json.loads(request.POST['data'])
         except:
@@ -384,7 +466,9 @@ class StoryView(APIView):
     def delete(self, request, story_id=None):
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         if story_id:
             story = Story.objects.get(id=int(story_id))
             story.clip.delete()
@@ -394,13 +478,15 @@ class StoryView(APIView):
 
 
 class FeelingsView(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
+    authentication_classes = [authentication.TokenAuthentication, JWTAuthentication]
     permission_classes = (IsAuthenticated,)
 
     def get(self, request, username=None):
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         if username:
             try:
                 usr = MyUser.objects.get(username=username)
@@ -420,7 +506,9 @@ class FeelingsView(APIView):
         data = JSONParser().parse(request)
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=404)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         serializer = FeelingsSerializer(me, data)
         if serializer.is_valid():
             serializer.save()
@@ -430,14 +518,16 @@ class FeelingsView(APIView):
 
 
 class ProfilePictureView(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
+    authentication_classes = [authentication.TokenAuthentication, JWTAuthentication]
     permission_classes = (IsAuthenticated,)
     parser_classes = (MultiPartParser, )
 
     def put(self, request):
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({"status": "Invalid Token"}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
             f = request.FILES["file"]
         except:
@@ -457,7 +547,9 @@ class ProfilePictureView(APIView):
     def get(self, request, username=None):
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({"status": "Invalid Token"}, status=404)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         if username:
             try:
                 user = MyUser.objects.get(username=username)
@@ -474,14 +566,16 @@ class ProfilePictureView(APIView):
 
 
 class UsersListView(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
+    authentication_classes = [authentication.TokenAuthentication, JWTAuthentication]
     permission_classes = (IsAuthenticated,)
 
     def get(self, request, username=None):
         data = JSONParser().parse(request)
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({"status": "Invalid Token"}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         if username:
             try:
                 user = MyUser.objects.get(username=username)
@@ -538,14 +632,16 @@ class UsersListView(APIView):
 
 
 class FriendsListView(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
+    authentication_classes = [authentication.TokenAuthentication, JWTAuthentication]
     permission_classes = (IsAuthenticated,)
 
     def put(self, request):  # We will send the notifications in the client side
         data = JSONParser().parse(request)
         me_user = get_user_by_token(request.META)
         if me_user is None:
-            return JsonResponse({'status': 'Invalid token'}, status=403)
+            me_user = request.user
+            if me_user is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
             username = data['user_username']
         except:
@@ -556,27 +652,26 @@ class FriendsListView(APIView):
             return JsonResponse({'status': 'User does not exists'}, status=404)
         if me_user in userModel.block_list.all():
             return JsonResponse({'status': 'You are blocked'}, status=410)
-        if userModel in me_user.friends.all() and userModel is me_user:
+        if userModel in me_user.friends.all() or userModel is me_user:
             return JsonResponse({'status': 'ALREADY EXISTS'}, status=400)
         me_user.friends.add(userModel)
         me_user.save()
         return JsonResponse({'status': 'ADDED'}, status=200)
 
-    def get(self, request):
+    def get(self, request, request_type=None):
+        if not request_type:
+            return JsonResponse({'status': 'No types'}, status=404)
         me_user = get_user_by_token(request.META)
         if me_user is None:
-            return JsonResponse({'status': 'Invalid token'}, status=403)
-        data = JSONParser().parse(request)
-        try:
-            what = data['type']
-        except KeyError:
-            return JsonResponse({'status': 'No Types'}, status=404)
-        if what == "friends":
+            me_user = request.user
+            if me_user is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
+        if request_type == "get_friends":
             serializer = FriendsListSerializer(me_user)
             return JsonResponse(serializer.data, safe=False, status=200)
-        elif what == "friend_requests":
+        elif request_type == "friend_requests":
             final_data = {}
-            users = MyUser.objects.filter(friends__in=me_user)
+            users = MyUser.objects.filter(friends__in=[me_user])
             for user in users:
                 if user not in me_user.friends.all():
                     final_data['friend_requests'] = user.username
@@ -586,7 +681,9 @@ class FriendsListView(APIView):
         data = JSONParser().parse(request)
         me_user = get_user_by_token(request.META)
         if me_user is None:
-            return JsonResponse({'status': 'Invalid token'}, status=404)
+            me_user = request.user
+            if me_user is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
             friend_username = data['user_username']
         except KeyError:
@@ -614,14 +711,16 @@ class FriendsListView(APIView):
 
 
 class ProfileMeView(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
+    authentication_classes = [authentication.TokenAuthentication, JWTAuthentication]
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         try:
             me = get_user_by_token(request.META)
             if me is None:
-                return JsonResponse({"status": "Invalid Token"}, status=404)
+                me = request.user
+                if me is None:
+                    return JsonResponse({'status': 'Invalid token'}, status=403)
             serializer = LoginUserSerializer(me, many=False, context={'request': request})
             serializer.data['interests'] = str_to_list(serializer.data['interests'])
             return JsonResponse(serializer.data, status=200)
@@ -634,7 +733,11 @@ class ProfileMeView(APIView):
         data = JSONParser().parse(request)
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'invalid Token'}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
+        if not me.account_type == "normal":
+            return JsonResponse({'status': 'Google accounts cannot change password. Change your password from Google'}, status=407)
         try:
             previous_password = data['prev_password']
             new_password = data['new_password']
@@ -651,19 +754,24 @@ class ProfileMeView(APIView):
             data = JSONParser().parse(request)
             me = get_user_by_token(request.META)
             if me is None:
-                return JsonResponse({"status": "Invalid Token"}, status=403)
+                me = request.user
+                if me is None:
+                    return JsonResponse({'status': 'Invalid token'}, status=403)
             try:
                 regexx = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
                 if not re.match("^[a-z0-9_]*$", data['username']):
                     return JsonResponse({"status": "Invalid characters in username"}, status=402)
                 if not re.match(regexx, data['email']):
                     return JsonResponse({"status": "Invalid characters in email"}, status=402)
+                if not data['email'] == me.email:
+                    try:
+                        _ = MyUser.objects.get(email=data['email'])
+                        return JsonResponse({"status": "Email already exists"}, status=400)
+                    except MyUser.DoesNotExist:
+                        generateLinkConfirm(me, data['email'])  # We change on confirm of the previous email
+
             except KeyError:
                 return JsonResponse({"status": "ERROR"}, status=500)
-            try:
-                data['private'] = True if data['private'] == 'true' else False
-            except KeyError:
-                return JsonResponse({"status": "ERROR"}, status=404)
             serializer = UpdateUserSerializer(me, data=data)
             if serializer.is_valid():
                 serializer.save()
@@ -677,7 +785,9 @@ class ProfileMeView(APIView):
     def delete(self, request):  # Delete the whole profile
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({"status": "Invalid Token"}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         data = JSONParser().parse(request)
         try:
             username = data['username']
@@ -692,21 +802,26 @@ class ProfileMeView(APIView):
             return JsonResponse({'status': "Invalid credentials"}, status=404)
 
 
-class RefreshToken(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
+class RefreshTokenn(APIView):
+    authentication_classes = [authentication.TokenAuthentication, JWTAuthentication]
     permission_classes = (IsAuthenticated,)
 
     def post(self, request):
         data = JSONParser().parse(request)
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({"status": "Invalid Token"}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
             password = data["password"]
         except KeyError:
             return JsonResponse({'status': 'Keys Not Found'}, status=404)
         if password == "":
             return JsonResponse({'status': 'Invalid Credentials'}, status=404)
+        if me.account_type == "google":
+            token = RefreshToken.for_user(me)  # generate token without username & password
+            return JsonResponse({'access_token': str(token.access_token), 'refresh_token': str(token)}, status=201)
 
         if me.check_password(password):
             if me.is_verified:
@@ -720,14 +835,16 @@ class RefreshToken(APIView):
 
 
 class BlockUser(APIView):  # Check this with views always. Messages, groups, date, friend add etc.
-    authentication_classes = [authentication.TokenAuthentication]
+    authentication_classes = [authentication.TokenAuthentication, JWTAuthentication]
     permission_classes = (IsAuthenticated,)
 
     def post(self, request):
         data = JSONParser().parse(request)
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({"status": "Invalid Token"}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
             user = MyUser.objects.get(username=data['user_username'])
         except:
@@ -751,7 +868,9 @@ class BlockUser(APIView):  # Check this with views always. Messages, groups, dat
         data = JSONParser().parse(request)
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({"status": "Invalid Token"}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
             user = MyUser.objects.get(username=data['user_username'])
         except:
@@ -764,19 +883,23 @@ class BlockUser(APIView):  # Check this with views always. Messages, groups, dat
     def get(self, request):
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({"status": "Invalid Token"}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         serializer = BlockListSerializer(me)
         return JsonResponse(serializer.data, safe=False, status=200)
 
 
 class DateView(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
+    authentication_classes = [authentication.TokenAuthentication, JWTAuthentication]
     permission_classes = (IsAuthenticated,)
 
     def get(self, request, date_id=None):
-        me = get_user_by_token(request)
+        me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         if date_id:
             try:
                 date = Date.objects.get(date_id=date_id)
@@ -793,12 +916,11 @@ class DateView(APIView):
 
     def post(self, request):
         data = JSONParser().parse(request)
-        try:
-            me = get_user_by_token(request.META)
-        except KeyError:
-            return JsonResponse({'status': 'Invalid token'}, status=404)
+        me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         if me.premium_days_left <= 0:
             if me.users_requested_date_day > 1:
                 return JsonResponse({'status': 'More than limit 1'}, status=406)
@@ -840,7 +962,9 @@ class DateView(APIView):
         data = JSONParser().parse(request)
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
             with_who = MyUser.objects.get(username=data["with"])
         except MyUser.DoesNotExist:
@@ -883,7 +1007,9 @@ class DateView(APIView):
         data = JSONParser().parse(request)
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=403)
+            me = request.user
+            if me is None:
+                return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
             with_who = MyUser.objects.get(username=data["with"])
         except:
