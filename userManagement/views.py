@@ -1,4 +1,5 @@
 import re
+from datetime import date
 
 import requests
 from django.contrib.auth.base_user import BaseUserManager
@@ -21,7 +22,6 @@ from .serializers import LoginUserSerializer, UpdateUserSerializer, FriendsListS
     InterestsSerializer, FeelingsSerializer, UserSerializer, UserGetSerializer, VerifySerializer, VerifyUserSerializer, \
     BlockListSerializer  # Our Serializer Classes
 from moviepy.editor import VideoFileClip
-
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -166,20 +166,21 @@ class RegisterView(APIView):
                 data['gender'] = True
             else:
                 data['gender'] = False
-            try:
-                data['age'] = int(data['age'])
-            except:
-                return JsonResponse({"status": "AGE ERROR"}, status=406)
-            if not check_age(data['age']):
+            date_of_birth = date.fromisoformat(data['date_of_birth'])
+            if not check_age(int((date.today() - date_of_birth).days / 365)):
                 return JsonResponse({'status': "AGE NOT ALLOWED"}, status=405)
+            data['date_of_birth'] = date_of_birth
             try:
-                if not re.match("^[a-z0-9_]*$", data['username']):
+                if not re.match("^[a-z0-9_]*$", data['username']) or not data['username'][0].isalpha():
                     return JsonResponse({"status": "Invalid characters in username"}, status=402)
                 regexx = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
                 if not re.match(regexx, data['email']):
                     return JsonResponse({"status": "Invalid characters in email"}, status=402)
                 if len(data['username']) < 5:
                     return JsonResponse({"status": "username needs to be at least 5 characters long"}, status=402)
+                for word in swear_words:
+                    if word in data['username'] or word in data['full_name'].lower():
+                        return JsonResponse({"status": "username or name is offensive"}, status=410)
             except:
                 return JsonResponse({"status": "ERROR"}, status=500)
             serializer = UserSerializer(data=data)
@@ -230,6 +231,7 @@ def sendVerifyLinkAgain(request):
             generateLink(me)
             return JsonResponse({'status': 'ANOTHER LINK'}, status=200)
 
+
 # TODO: Apple etc. also
 class GoogleView(APIView):
     def post(self, request):
@@ -258,17 +260,21 @@ class GoogleView(APIView):
                     gender = True
                 else:
                     gender = False
-                age = int(dataa['age'])
-                if not check_age(age):
+                date_of_birth = date.fromisoformat(dataa['date_of_birth'])
+                if not check_age(int((date.today() - date_of_birth).days / 365)):
                     return JsonResponse({'status': "AGE NOT ALLOWED"}, status=405)
                 user = MyUser()
                 user.email = data['email']
-                if not re.match("^[a-z0-9_]*$", dataa['username']):
+                if not re.match("^[a-z0-9_]*$", dataa['username']) or not dataa['username'][0].isalpha():
                     return JsonResponse({"status": "Invalid characters in username"}, status=402)
                 if len(dataa['username']) < 5:
                     return JsonResponse({"status": "username needs to be at least 5 characters long"}, status=402)
+                for word in swear_words:
+                    if word in dataa['username'] or word in dataa['full_name'].lower():
+                        return JsonResponse({"status": "username or name is offensive"}, status=410)
                 user.username = dataa['username']
-                user.age = age
+                user.full_name = dataa['full_name']
+                user.date_of_birth = date_of_birth
                 user.gender = gender
                 user.account_type = "google"
                 # provider random default password
@@ -602,6 +608,8 @@ class UsersListView(APIView):
             age_range = int(data['age_range'])
         except KeyError:
             age_range = 100
+        except ValueError:
+            return JsonResponse({'status': 'ERROR'}, status=500)
         if me.premium_days_left > 0:
             try:
                 with_interests = True if data['with_interests'] == "true" else False
@@ -758,20 +766,29 @@ class ProfileMeView(APIView):
                 if me is None:
                     return JsonResponse({'status': 'Invalid token'}, status=403)
             try:
+                date_of_birth = date.fromisoformat(data['date_of_birth'])
+                if not check_age(int((date.today() - date_of_birth).days / 365)):
+                    return JsonResponse({'status': "AGE NOT ALLOWED"}, status=405)
                 regexx = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-                if not re.match("^[a-z0-9_]*$", data['username']):
+                if len(data['username']) < 5:
+                    return JsonResponse({"status": "username needs to be at least 5 characters long"}, status=402)
+                if not re.match("^[a-z0-9_]*$", data['username']) or not data['username'][0].isalpha():
                     return JsonResponse({"status": "Invalid characters in username"}, status=402)
+                for word in swear_words:
+                    if word in data['username'] or word in data['full_name'].lower():
+                        return JsonResponse({"status": "username or name is offensive"}, status=410)
                 if not re.match(regexx, data['email']):
                     return JsonResponse({"status": "Invalid characters in email"}, status=402)
+
                 if not data['email'] == me.email:
                     try:
                         _ = MyUser.objects.get(email=data['email'])
                         return JsonResponse({"status": "Email already exists"}, status=400)
                     except MyUser.DoesNotExist:
                         generateLinkConfirm(me, data['email'])  # We change on confirm of the previous email
-
             except KeyError:
                 return JsonResponse({"status": "ERROR"}, status=500)
+            data['date_of_birth'] = date_of_birth
             serializer = UpdateUserSerializer(me, data=data)
             if serializer.is_valid():
                 serializer.save()

@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.db import models
 from django.contrib.auth.models import (
     BaseUserManager, AbstractBaseUser
@@ -13,7 +15,7 @@ class Story(models.Model):
 
 class MyUserManager(BaseUserManager):
     
-    def create_user(self, email, age, username, gender, premium, password):
+    def create_user(self, email, date_of_birth, full_name, username, gender, premium, password):
 
         """
         Creates and saves a User with the given email, date of
@@ -21,10 +23,10 @@ class MyUserManager(BaseUserManager):
         """
         if not email:
             raise ValueError('Users must have an email address')
-
         user = self.model(
             email=self.normalize_email(email),
-            age=age,
+            date_of_birth=date_of_birth,
+            full_name=full_name,
             gender=gender,
             premium=premium,
             username=username,
@@ -36,7 +38,7 @@ class MyUserManager(BaseUserManager):
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, age, gender, username, password):
+    def create_superuser(self, email, full_name, date_of_birth, gender, username, password):
         """
         Creates and saves a superuser with the given email, date of
         birth and password.
@@ -46,7 +48,8 @@ class MyUserManager(BaseUserManager):
             gender=gender,
             premium=True,
             username=username,
-            age=age,
+            full_name=full_name,
+            date_of_birth=date_of_birth,
             password=password
         )
         user.is_admin = True
@@ -62,7 +65,8 @@ class MyUser(AbstractBaseUser):
         null=False,
         blank=False
     )
-    age = models.IntegerField(blank=False)
+    full_name = models.CharField(blank=False, null=False, default="", max_length=20)
+    date_of_birth = models.DateField(blank=False, null=False, default=date.fromisoformat("2000-01-01"))
     profile_pic = models.ImageField(upload_to = 'pics/', blank=True, null=True, default=None)
     gender = models.BooleanField(default=True)
     premium_days_left = models.IntegerField(default=0)
@@ -75,7 +79,7 @@ class MyUser(AbstractBaseUser):
     users_searched_day = models.IntegerField(default=0)
     users_requested_date_day = models.IntegerField(default=0)
     feeling = models.CharField(default="nothing", max_length=15)
-    about = models.CharField(max_length=30, default="A new user")
+    about = models.CharField(max_length=40, default="A new user")
     create_date = models.DateTimeField(auto_now_add=True)
     is_verified = models.BooleanField(default=False)
     interests = models.CharField(default="[]", max_length=50)
@@ -89,7 +93,7 @@ class MyUser(AbstractBaseUser):
     objects = MyUserManager()
 
     USERNAME_FIELD = 'username'
-    REQUIRED_FIELDS = ['age', 'gender', 'email']
+    REQUIRED_FIELDS = ['date_of_birth', 'gender', 'email', 'full_name']
 
     def remove_old_profile_pic(self):
         if self.profile_pic:
@@ -97,6 +101,9 @@ class MyUser(AbstractBaseUser):
             print(f"L: {self.profile_pic.path}")
             self.profile_pic.delete()
             self.profile_pic = None
+
+    def get_age(self):
+        return int((date.today() - self.date_of_birth).days / 365)
 
     def add_story(self, story):
         self.stories.add(story)

@@ -12,9 +12,32 @@ class User1Test(APITestCase):
 
         data = {
             "email": "pooyasalehi69@gmail.com",
+            "username": "fuckyou",
+            "password": "Pooya1274406641@",
+            "date_of_birth": "2000-01-05",
+            'full_name': "Meow Meow2",
+            "gender": "male"
+        }
+        response = self.client.post(path=f"{self.url}/api/register", data=data, format='json')
+        self.assertEqual(response.status_code, 410)
+
+        data = {
+            "email": "pooyasalehi69@gmail.com",
+            "username": "good_cat2",
+            "password": "Pooya1274406641@",
+            "date_of_birth": "2000-01-05",
+            'full_name': "Fuck",
+            "gender": "male"
+        }
+        response = self.client.post(path=f"{self.url}/api/register", data=data, format='json')
+        self.assertEqual(response.status_code, 410)
+
+        data = {
+            "email": "pooyasalehi69@gmail.com",
             "username": "pouyad_ai",
             "password": "Pooya1274406641@",
-            "age": 19,
+            "date_of_birth": "2000-01-05",
+            'full_name': "Meow Meow2",
             "gender": "male"
         }
         response = self.client.post(path=f"{self.url}/api/register", data=data, format='json')
@@ -24,7 +47,8 @@ class User1Test(APITestCase):
             "email": "test@gmail.com",
             "username": "pouyad_ai2",
             "password": "Pooya1274406641@",
-            "age": 25,
+            "date_of_birth": "1993-01-05",
+            'full_name': "Meow Meow",
             "gender": "male"
         }
         response = self.client.post(path=f"{self.url}/api/register", data=data, format='json')
@@ -34,18 +58,20 @@ class User1Test(APITestCase):
             "username": "catfish_2",
             "email": "pouya.psalehi@gmail.com",
             "password": "Pooya1274406641@",
-            "age": 18,
-            "gender": "female"
+            "date_of_birth": "1996-01-05",
+            "gender": "female",
+            'full_name': "Pouya Salehi"
         }
         response = self.client.post(path=f"{self.url}/api/register", data=data, format='json')
         self.assertEqual(response.status_code, 200)
 
         data = {
             'username': "pouyacat34",
-            "age": 18,
+            "date_of_birth": "2001-01-05",
             "gender": "female",
+            'full_name': "Pouya Salehi2",
             # Each time get a token from google auth api https://developers.google.com/oauthplayground/  with value : https://www.googleapis.com/auth/userinfo.email
-            'token': "ya29.a0ARrdaM9D5s_UMm6TdZivO1RA6aSCPvam0J0-h3QFKpMvpXbvMvrU59vhXg57u2XV2ODXMEBKzLz5rCI2MYJFBexcnEz7gHM_ZQINC6VGSROz05g2umVGdFS-kRJRt0YIsLBNLeXQ-juNOzX7P72dbB_c3QtB"
+            'token': "ya29.a0ARrdaM-OLm1VUElarm608EnaixcWWIdazjAtOXSq7A5H1ihmXNNtyfcv6wWf3Ed-zkobKHugb04pfaP26VngFLsE1PT0nkldaUNLHGkgm0PBPDaZdqtPcrXJJJQUvvd0IhNwxPNi03nDKqz4lbZi0sx86DXn"
         }
         response = self.client.post(path=f"{self.url}/api/google", data=data, format='json')
         json_response = response.json()
@@ -129,18 +155,32 @@ class User1Test(APITestCase):
             'username': "pouyad_ai8",
             'email': "pouya.psalehi@gmail.com",
             'about': "I just changed my bio",
-            'private': 'true'
+            'private': 'true',
+            'date_of_birth': "2010-01-01",
+            'full_name': "Gta Meow"
+        }
+        response = self.client.put(path=f"{self.url}/api/profile", data=data, format='json')
+        self.assertEqual(response.status_code, 405)
+
+        data = {
+            'username': "pouyad_ai8",
+            'email': "pouya.psalehi@gmail.com",
+            'about': "I just changed my bio",
+            'private': 'true',
+            'date_of_birth': "2001-01-01",
+            'full_name': "Gta Cat"
         }
         response = self.client.put(path=f"{self.url}/api/profile", data=data, format='json')
         json_response = response.json()
-        print(f"Error: {json_response}")
         self.assertEqual(response.status_code, 400)
 
         data = {
             'username': "pouyad_ai8",
             'email': "pouyaaa.psalehi@gmail.com",
             'about': "I just changed my bio",
-            'private': 'true'
+            'private': 'true',
+            'date_of_birth': "2003-01-01",
+            'full_name': "Pouya Salehi"
         }
         response = self.client.put(path=f"{self.url}/api/profile", data=data, format='json')
         json_response = response.json()

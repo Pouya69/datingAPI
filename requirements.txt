@@ -23,5 +23,5 @@ stripe==2.56.0
 urllib3==1.26.4
 virtualenv==20.4.2
 virtualenvwrapper-win==1.2.6
-
 channels~=3.0.3
+moviepy~=1.0.3

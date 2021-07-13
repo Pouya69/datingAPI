@@ -1,13 +1,19 @@
+from datetime import date
+
 from .models import MyUser,VerifyLink
 from rest_framework import serializers
 
 
-#Login Serializer
 class UserGetSerializer(serializers.ModelSerializer):
     create_date = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%S", required=False, read_only=True)
+    age = serializers.SerializerMethodField('get_age')
+
+    def get_age(self, user):
+        return int((date.today() - user.date_of_birth).days / 365)
+
     class Meta:
         model = MyUser
-        fields = ['age', 'gender', 'username', 'about', 'dating_with', 'feeling', 'interests', 'create_date']
+        fields = ['age', 'gender', 'username', 'about', 'dating_with', 'feeling', 'interests', 'create_date', 'full_name']
 
 
 class UserSerializerName(serializers.ModelSerializer):
@@ -22,16 +28,17 @@ class UserSerializerName(serializers.ModelSerializer):
 class LoginUserSerializer(serializers.ModelSerializer):
     dating_with = UserSerializerName(many=False, read_only=True)
     create_date = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%S", required=False, read_only=True)
+    date_of_birth = serializers.DateField(format="%Y-%m-%d", required=False, read_only=True)
     """For Serializing User"""
     class Meta:
         model = MyUser
-        fields = ['email', 'age', 'gender', 'username', 'about', 'dating_with', 'feeling', 'interests', 'premium_days_left', 'private', 'create_date']
+        fields = ['email', 'date_of_birth', 'gender', 'username', 'about', 'dating_with', 'feeling', 'interests', 'premium_days_left', 'private', 'create_date', 'full_name']
 
 
 class UpdateUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = MyUser
-        fields = ['username', 'about', 'private']
+        fields = ['username', 'about', 'private', 'date_of_birth', 'full_name']
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -40,9 +47,6 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = MyUser
         fields = '__all__'
-
-
-
 
 
 class FriendsListSerializer(serializers.ModelSerializer):
