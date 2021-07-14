@@ -16,12 +16,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import authentication
 from django.contrib.auth import authenticate
 from PIL import Image
-from rest_framework.parsers import FileUploadParser, MultiPartParser
+from rest_framework.parsers import MultiPartParser
 from .models import MyUser, VerifyLink, Story  # Our Message model
 from .serializers import LoginUserSerializer, UpdateUserSerializer, FriendsListSerializer, PictureSerializer, \
-    InterestsSerializer, FeelingsSerializer, UserSerializer, UserGetSerializer, VerifySerializer, VerifyUserSerializer, \
+    FeelingsSerializer, UserSerializer, UserGetSerializer, \
     BlockListSerializer  # Our Serializer Classes
 from moviepy.editor import VideoFileClip
+import jwt
+from django.conf import settings
+from datetime import timedelta
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -232,7 +235,7 @@ def sendVerifyLinkAgain(request):
             return JsonResponse({'status': 'ANOTHER LINK'}, status=200)
 
 
-# TODO: Apple etc. also
+# No apple because it costs money
 class GoogleView(APIView):
     def post(self, request):
         dataa = JSONParser().parse(request)
@@ -332,9 +335,12 @@ class LogoutView(APIView):
             if me is None:
                 return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
-            p = Token.objects.get(user=me)
-            p.delete()
-            return JsonResponse({'status': 'LOGGED OUT'}, status=200)
+            if me.account_type == "normal":
+                p = Token.objects.get(user=me)
+                p.delete()
+                return JsonResponse({'status': 'LOGGED OUT'}, status=200)
+            else:
+                RefreshToken.for_user(user=me)
         except MyUser.DoesNotExist:
             return JsonResponse({'status': 'INVALID CREDENTIALS'}, status=404)
 
@@ -824,22 +830,21 @@ class RefreshTokenn(APIView):
     permission_classes = (IsAuthenticated,)
 
     def post(self, request):
-        data = JSONParser().parse(request)
         me = get_user_by_token(request.META)
         if me is None:
             me = request.user
             if me is None:
                 return JsonResponse({'status': 'Invalid token'}, status=403)
+        if not me.account_type == "normal":
+            token = RefreshToken.for_user(me)  # generate token without username & password
+            return JsonResponse({'access_token': str(token.access_token), 'refresh_token': str(token)}, status=201)
+        data = JSONParser().parse(request)
         try:
             password = data["password"]
         except KeyError:
             return JsonResponse({'status': 'Keys Not Found'}, status=404)
         if password == "":
             return JsonResponse({'status': 'Invalid Credentials'}, status=404)
-        if me.account_type == "google":
-            token = RefreshToken.for_user(me)  # generate token without username & password
-            return JsonResponse({'access_token': str(token.access_token), 'refresh_token': str(token)}, status=201)
-
         if me.check_password(password):
             if me.is_verified:
                 Token.objects.get(user=me).delete()

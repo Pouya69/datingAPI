@@ -71,7 +71,7 @@ class User1Test(APITestCase):
             "gender": "female",
             'full_name': "Pouya Salehi2",
             # Each time get a token from google auth api https://developers.google.com/oauthplayground/  with value : https://www.googleapis.com/auth/userinfo.email
-            'token': "ya29.a0ARrdaM-OLm1VUElarm608EnaixcWWIdazjAtOXSq7A5H1ihmXNNtyfcv6wWf3Ed-zkobKHugb04pfaP26VngFLsE1PT0nkldaUNLHGkgm0PBPDaZdqtPcrXJJJQUvvd0IhNwxPNi03nDKqz4lbZi0sx86DXn"
+            'token': "ya29.a0ARrdaM8g8m0vt54pR6obNJ4eGxVfK17zc4QS-pbVUiAFuGhF_QWi0LLqZiSrYqqVcAapRqXAadZCb4zoA7RagHeB0pWtL9lQEqMx3GFPOk9eLwXA_tJ8AclFyb2fRedvj1RgjVkfa0-8k4JhGkuWgett7B6-"
         }
         response = self.client.post(path=f"{self.url}/api/google", data=data, format='json')
         json_response = response.json()
@@ -376,6 +376,25 @@ class User1Test(APITestCase):
         user_2 = MyUser.objects.get(username="pouyacat34")
         self.assertEqual(user_1.dating_with, None)
         self.assertEqual(user_2.dating_with, None)
+
+    def test_refresh_token(self):
+        data = {
+            'password': "Pooya1274406641@"
+        }
+        response = self.client.post(path=f"{self.url}/api/refreshToken", data=data, format='json')
+        self.assertEqual(response.status_code, 201)
+        json_response = response.json()
+        self.assertNotEqual(json_response['token'], self.token_1)
+        self.token_1 = json_response['token']
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token_4}")  # Go to other user
+        response = self.client.post(path=f"{self.url}/api/refreshToken", format='json')
+        json_response = response.json()
+        print(json_response)
+        self.assertEqual(response.status_code, 201)
+
+        self.assertNotEqual(json_response['access_token'], self.token_4)
+        self.token_4 = json_response['access_token']
 
     def test_dating(self):
         user_1 = MyUser.objects.get(username="pouyad_ai")
