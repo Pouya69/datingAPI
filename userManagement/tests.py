@@ -66,12 +66,23 @@ class User1Test(APITestCase):
         self.assertEqual(response.status_code, 200)
 
         data = {
+            "username": "catfish_22",
+            "email": "pouya.psalehi2@gmail.com",
+            "password": "Pooya1274406641@",
+            "date_of_birth": "2006-01-05",
+            "gender": "female",
+            'full_name': "Pouya Salehi"
+        }
+        response = self.client.post(path=f"{self.url}/api/register", data=data, format='json')
+        self.assertEqual(response.status_code, 200)
+
+        data = {
             'username': "pouyacat34",
             "date_of_birth": "2001-01-05",
             "gender": "female",
             'full_name': "Pouya Salehi2",
             # Each time get a token from google auth api https://developers.google.com/oauthplayground/  with value : https://www.googleapis.com/auth/userinfo.email
-            'token': "ya29.a0ARrdaM8g8m0vt54pR6obNJ4eGxVfK17zc4QS-pbVUiAFuGhF_QWi0LLqZiSrYqqVcAapRqXAadZCb4zoA7RagHeB0pWtL9lQEqMx3GFPOk9eLwXA_tJ8AclFyb2fRedvj1RgjVkfa0-8k4JhGkuWgett7B6-"
+            'token': "ya29.a0ARrdaM_-L-TVy8KBDMGcCSi4TZcUBNyPUDLPR4H1sTr2ZnIPMJJN3fbzW5uvPObvq8mShO-t6HX5Ow-7eTamYbC3wIVs9qkzNGtT1bMkoWdnsOsHP8-lneGKFMXomGXebhN6Jhr6v1uF7qjvlkVdlXdc_YZo"
         }
         response = self.client.post(path=f"{self.url}/api/google", data=data, format='json')
         json_response = response.json()
@@ -80,6 +91,10 @@ class User1Test(APITestCase):
         # Bearer <Token>
 
         link = self.url + '/activate/' + VerifyLink.objects.get(user=MyUser.objects.get(username="pouyad_ai")).token
+        response = self.client.get(path=link, format='json')
+        self.assertEqual(response.status_code, 200)
+
+        link = self.url + '/activate/' + VerifyLink.objects.get(user=MyUser.objects.get(username="catfish_22")).token
         response = self.client.get(path=link, format='json')
         self.assertEqual(response.status_code, 200)
 
@@ -123,6 +138,18 @@ class User1Test(APITestCase):
         token = json_response['token']
         self.assertNotEqual(token, "")
         self.token_3 = token
+
+        data = {
+            "username": "catfish_22",
+            "password": "Pooya1274406641@"
+        }
+        response = self.client.post(path=f"{self.url}/api/login", data=data, format='json')
+        self.assertEqual(response.status_code, 200)
+        json_response = response.json()
+        token = json_response['token']
+        self.assertNotEqual(token, "")
+        self.token_5 = token
+
         self.client.credentials(HTTP_AUTHORIZATION=f"token {self.token_1}")
 
         # self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token_4}")  # For google is Bearer

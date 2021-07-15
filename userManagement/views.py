@@ -22,9 +22,6 @@ from .serializers import LoginUserSerializer, UpdateUserSerializer, FriendsListS
     FeelingsSerializer, UserSerializer, UserGetSerializer, \
     BlockListSerializer  # Our Serializer Classes
 from moviepy.editor import VideoFileClip
-import jwt
-from django.conf import settings
-from datetime import timedelta
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -170,8 +167,8 @@ class RegisterView(APIView):
             else:
                 data['gender'] = False
             date_of_birth = date.fromisoformat(data['date_of_birth'])
-            if not check_age(int((date.today() - date_of_birth).days / 365)):
-                return JsonResponse({'status': "AGE NOT ALLOWED"}, status=405)
+            if int((date.today() - date_of_birth).days / 365) < 13:
+                return JsonResponse({"status": "Should be more than 13"}, status=408)
             data['date_of_birth'] = date_of_birth
             try:
                 if not re.match("^[a-z0-9_]*$", data['username']) or not data['username'][0].isalpha():
@@ -264,8 +261,8 @@ class GoogleView(APIView):
                 else:
                     gender = False
                 date_of_birth = date.fromisoformat(dataa['date_of_birth'])
-                if not check_age(int((date.today() - date_of_birth).days / 365)):
-                    return JsonResponse({'status': "AGE NOT ALLOWED"}, status=405)
+                if int((date.today() - date_of_birth).days / 365) < 13:
+                    return JsonResponse({"status": "Should be more than 13"}, status=408)
                 user = MyUser()
                 user.email = data['email']
                 if not re.match("^[a-z0-9_]*$", dataa['username']) or not dataa['username'][0].isalpha():
@@ -406,6 +403,10 @@ class StoryView(APIView):
                 usr = MyUser.objects.get(username=username)
             except MyUser.DoesNotExist:
                 return JsonResponse({'status': 'username not exists'}, status=404)
+            my_age = me.get_age()
+            user_age = usr.get_age()
+            if (not check_age(my_age) and check_age(user_age)) or (check_age(my_age) and not check_age(user_age)):
+                return JsonResponse({'status': 'Cannot friend or date with ages above 18 if you are under 18 and so on'}, status=409)
             if me in usr.block_list.all():
                 return JsonResponse({'status': 'You are blocked'}, status=410)
             if usr.private is True:
@@ -504,6 +505,10 @@ class FeelingsView(APIView):
                 usr = MyUser.objects.get(username=username)
                 if me in usr.block_list.all():
                     return JsonResponse({'status': 'You are blocked'}, status=410)
+                my_age = me.get_age()
+                user_age = usr.get_age()
+                if (not check_age(my_age) and check_age(user_age)) or (check_age(my_age) and not check_age(user_age)):
+                    return JsonResponse({'status': 'Cannot friend or date with ages above 18 if you are under 18 and so on'}, status=409)
                 if usr.private is True:
                     if me not in usr.friends.all():
                         return JsonResponse({'status': 'You are not in their friend list. private account'}, status=406)
@@ -595,6 +600,10 @@ class UsersListView(APIView):
                 return JsonResponse({'status': 'USER NOT EXISTS'}, status=404)
             if me in user.block_list.all():
                 return JsonResponse({'status': 'You are blocked'}, status=410)
+            my_age = me.get_age()
+            user_age = user.get_age()
+            if (not check_age(my_age) and check_age(user_age)) or (check_age(my_age) and not check_age(user_age)):
+                return JsonResponse({'status': 'Cannot friend or date with ages above 18 if you are under 18 and so on'}, status=409)
             if user.private is True:
                 if me not in user.friends.all():
                     return JsonResponse({'status': 'You are not in their friend list. private account'}, status=406)
@@ -616,6 +625,9 @@ class UsersListView(APIView):
             age_range = 100
         except ValueError:
             return JsonResponse({'status': 'ERROR'}, status=500)
+        if not check_age(me.get_age()):
+            if age_range > 5:
+                age_range = 5
         if me.premium_days_left > 0:
             try:
                 with_interests = True if data['with_interests'] == "true" else False
@@ -668,6 +680,10 @@ class FriendsListView(APIView):
             return JsonResponse({'status': 'You are blocked'}, status=410)
         if userModel in me_user.friends.all() or userModel is me_user:
             return JsonResponse({'status': 'ALREADY EXISTS'}, status=400)
+        my_age = me_user.get_age()
+        user_age = userModel.get_age()
+        if (not check_age(my_age) and check_age(user_age)) or (check_age(my_age) and not check_age(user_age)):
+            return JsonResponse({'status': 'Cannot friend or date with ages above 18 if you are under 18 and so on'},status=409)
         me_user.friends.add(userModel)
         me_user.save()
         return JsonResponse({'status': 'ADDED'}, status=200)
@@ -773,8 +789,8 @@ class ProfileMeView(APIView):
                     return JsonResponse({'status': 'Invalid token'}, status=403)
             try:
                 date_of_birth = date.fromisoformat(data['date_of_birth'])
-                if not check_age(int((date.today() - date_of_birth).days / 365)):
-                    return JsonResponse({'status': "AGE NOT ALLOWED"}, status=405)
+                if int((date.today() - date_of_birth).days / 365) < 13:
+                    return JsonResponse({"status": "Should be more than 13"}, status=408)
                 regexx = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
                 if len(data['username']) < 5:
                     return JsonResponse({"status": "username needs to be at least 5 characters long"}, status=402)
@@ -956,6 +972,13 @@ class DateView(APIView):
             return JsonResponse({'status': 'You are blocked'}, status=410)
         if me.dating_with or with_who.dating_with:
             return JsonResponse({'status': 'Already dating'}, status=402)
+        my_age = me.get_age()
+        with_who_age = with_who.get_age()
+        if (not check_age(my_age) and check_age(with_who_age)) or (check_age(my_age) and not check_age(with_who_age)):
+            return JsonResponse({'status': 'Cannot friend or date with ages above 18 if you are under 18 and so on'}, status=409)
+        if not check_age(me.get_age()):
+            if abs(with_who.get_age() - me.get_age()) > 2:
+                return JsonResponse({'Age difference is too much'}, status=411)
         try:
             if Date.objects.filter(users__in=[me]).get(users__in=[with_who]).exists():
                 return JsonResponse({'status': 'Already a date request'}, status=403)

@@ -153,6 +153,8 @@ def get_user_random(me):
         if tries >= 10:
             raise MyUser.DoesNotExist
         randomed = random.choice(MyUser.objects.all())
+        if (not check_age(me.get_age()) and check_age(randomed.get_age())) or (check_age(me.get_age()) and not check_age(randomed.get_age())):
+            continue
         if not randomed == me and randomed not in me.friends.all() and me not in randomed.block_list.all() and randomed is not me.dating_with:
             me.users_searched_day += 1
             me.save()
@@ -166,6 +168,8 @@ def get_user_by_interests(age_range, genderR, me):
         if tries >= 10:
             raise MyUser.DoesNotExist
         randomed = random.choice(MyUser.objects.filter(gender=genderR, status=False))
+        if (not check_age(me.get_age()) and check_age(randomed.get_age())) or (check_age(me.get_age()) and not check_age(randomed.get_age())):
+            continue
         if not randomed == me and randomed not in me.friends.all() and me not in randomed.block_list.all() and randomed is not me.dating_with:
             if abs(randomed.get_age() - me.get_age()) <= age_range:
                 me.users_searched_day += 1
@@ -181,6 +185,8 @@ def get_user_by_interests_PREMIUM(interests, age_range, genderR, me, with_intere
             raise MyUser.DoesNotExist
         for interest in interests:
             randomed = random.choice(MyUser.objects.filter(gender=genderR, status=False))
+            if (not check_age(me.get_age()) and check_age(randomed.get_age())) or (check_age(me.get_age()) and not check_age(randomed.get_age())):
+                continue
             if not randomed == me and randomed not in me.friends.all() and me not in randomed.block_list.all() and randomed is not me.dating_with:
                 if abs(randomed.get_age() - me.get_age()) <= age_range:
                     if with_interests:
@@ -189,6 +195,8 @@ def get_user_by_interests_PREMIUM(interests, age_range, genderR, me, with_intere
                             me.save()
                             return randomed
                     else:
+                        me.users_searched_day += 1
+                        me.save()
                         return randomed
 
 

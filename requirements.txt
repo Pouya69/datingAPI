@@ -25,4 +25,3 @@ virtualenv==20.4.2
 virtualenvwrapper-win==1.2.6
 channels~=3.0.3
 moviepy~=1.0.3
-PyJWT~=2.1.0

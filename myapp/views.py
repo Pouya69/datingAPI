@@ -80,6 +80,9 @@ def join_chat(request, chat_id=None):
         except:
             return JsonResponse({'status': 'Invalid Group'}, status=404)
         if group not in me.chat_list.all() and me not in group.users.all():
+            for user in group.users.all():
+                if (not check_age(me.get_age()) and check_age(user.get_age())) or (check_age(me.get_age()) and not check_age(user.get_age())):
+                    return JsonResponse({'status': 'Cannot be in group with ages above 18 if you are under 18 and so on'}, status=409)
             group.join_chat(me)
             me.chat_list.add(group)
             return JsonResponse({'status': 'Joined Group'}, status=200)
@@ -123,6 +126,9 @@ class GroupListView(APIView):
                     user = MyUser.objects.get(username=u_username)
                     if me in user.block_list.all():
                         return JsonResponse({'status': f'You are blocked by {user.username}'}, status=410)
+                    for user in group.users.all():
+                        if (not check_age(me.get_age()) and check_age(user.get_age())) or (check_age(me.get_age()) and not check_age(user.get_age())):
+                            return JsonResponse({'status': 'Cannot be in group with ages above 18 if you are under 18 and so on'}, status=409)
                     group.users.add(user)
                 except MyUser.DoesNotExist:
                     group.delete()
@@ -171,6 +177,9 @@ class GroupListView(APIView):
                             return JsonResponse({'status': 'You are the user'}, status=402)
                         if me in user_user.block_list.all():
                             return JsonResponse({'status': 'You are blocked'}, status=410)
+                        for user in group.users.all():
+                            if (not check_age(me.get_age()) and check_age(user.get_age())) or (check_age(me.get_age()) and not check_age(user.get_age())):
+                                return JsonResponse({'status': 'Cannot be in group with ages above 18 if you are under 18 and so on'}, status=409)
                         if me not in user_user.friends.all() or user_user not in me.friends.all():
                             return JsonResponse({'status': 'You are not friends'}, status=407)
                         if not user_user not in users:
@@ -180,7 +189,7 @@ class GroupListView(APIView):
                             # final_data['last_message'] = str_to_dict(final_data['last_message'])
                             return JsonResponse(final_data, status=200)
                     except MyUser.DoesNotExist:
-                        return JsonResponse({'status': 'User not vaild : {add_username}'}, status=404)
+                        return JsonResponse({'status': f'User not vaild : {add_username}'}, status=404)
             except:
                 return JsonResponse({'status': f'Users not vaild'}, status=404)
         if me not in admins:
