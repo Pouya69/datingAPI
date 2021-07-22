@@ -1,14 +1,7 @@
 from rest_framework import serializers
 from django.contrib.postgres.fields import ArrayField
-from myapp.models import Message,Group,Date
+from myapp.models import Message, Group, Date
 from userManagement.models import MyUser
-
-
-class GroupPictureSerializer(serializers.ModelSerializer):
-    """For Serializing Picture"""
-    class Meta:
-        model = Group
-        fields = ['group_img']
 
 
 class DateSerializer(serializers.ModelSerializer):
@@ -16,6 +9,13 @@ class DateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Date
         fields = ['users']
+
+
+class GroupPictureSerializer(serializers.ModelSerializer):
+    """For Serializing Picture"""
+    class Meta:
+        model = Group
+        fields = ['group_img']
 
 
 class UserSerializerName(serializers.ModelSerializer):
@@ -56,10 +56,11 @@ class MessageSerializerWrite(serializers.ModelSerializer):
 
 
 class GroupSerializerGET(serializers.ModelSerializer):
+    users = UserSerializerName(many=True, read_only=True)
     """For Serializing Message"""
     class Meta:
         model = Group
-        fields = ['users', 'name', 'id_chat', 'last_message']
+        fields = ['users', 'name', 'id_chat']
 
 
 class GroupSerializerIdChat(serializers.ModelSerializer):
@@ -70,6 +71,9 @@ class GroupSerializerIdChat(serializers.ModelSerializer):
 
 
 class GroupSerializerAdmins(serializers.ModelSerializer):
+    users = UserSerializerName(many=True, read_only=True)
+    admins = UserSerializerName(many=True, read_only=True)
+    owner = UserSerializerName(many=False, read_only=True)
     """For Serializing Message"""
     class Meta:
         model = Group

@@ -132,7 +132,7 @@ class MyUser(AbstractBaseUser):
 class VerifyLink(models.Model):
     token = models.TextField(blank=False, primary_key=True)
     user = models.ForeignKey(MyUser, related_name='register_user', on_delete=models.CASCADE)
-    verify_type = models.CharField(max_length=10, default="")
+    verify_type = models.CharField(max_length=15, default="")
     extra_data = models.TextField(default="")
 
     def __str__(self):

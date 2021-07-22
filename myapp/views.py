@@ -1,6 +1,6 @@
 # chat/views.py
 import os
-from django.http.response import JsonResponse, HttpResponse
+from django.http.response import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.parsers import JSONParser
@@ -12,7 +12,7 @@ from rest_framework import authentication
 from PIL import Image
 from rest_framework.parsers import FileUploadParser, MultiPartParser
 from .models import Message, Group, Date, FileMessage  # Our Message model
-from .serializers import GroupPictureSerializer, MessageSerializer, DateSerializer, \
+from .serializers import GroupPictureSerializer, \
     GroupSerializerAdmins, GroupSerializerGET, GroupSerializerIdChat  # Our Serializer Classes
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -74,7 +74,7 @@ def join_chat(request, chat_id=None):
     if chat_id:
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'Invalid Token'}, status=404)
+            return JsonResponse({'status': 'Invalid Token'}, status=403)
         try:
             group = Group.objects.get(id=int(chat_id))
         except:
@@ -106,10 +106,8 @@ class GroupListView(APIView):
             if me not in group.users.all():
                 return JsonResponse({'status': 'You are not in the group'}, status=405)
             final_data = GroupSerializerGET(group, many=False, context={'request': request}).data
-            final_data['last_message'] = str_to_dict(final_data['last_message'])
             return JsonResponse(final_data, status=200)
         final_data = GroupSerializerGET(me.chat_list.all(), many=True, context={'request': request}).data
-        final_data['last_message'] = str_to_dict(final_data['last_message'])
         return JsonResponse(final_data, status=200)
 
     def post(self, request):
@@ -152,7 +150,7 @@ class GroupListView(APIView):
         if not chat_id:
             return JsonResponse({'status': 'Invalid chat_id'}, status=404)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=404)
+            return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
             group = Group.objects.get(id=chat_id)
         except Group.DoesNotExist:
@@ -246,7 +244,7 @@ class GroupListView(APIView):
         data = JSONParser().parse(request)
         me = get_user_by_token(request.META)
         if me is None:
-            return JsonResponse({'status': 'Invalid token'}, status=404)
+            return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
             command = data['command']
             if command == "":
@@ -323,6 +321,9 @@ class GroupPictureView(APIView):
             return JsonResponse({"status": "GROUP NOT EXISTS"}, status=400)
 
     def get(self, request, group_id=None):
+        me = get_user_by_token(request.META)
+        if me is None:
+            return JsonResponse({"status": "Invalid Token"}, status=403)
         if group_id:
             try:
                 gr = Group.objects.get(id=group_id)

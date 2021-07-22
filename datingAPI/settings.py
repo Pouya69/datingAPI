@@ -46,7 +46,7 @@ DEBUG = True
 
 AUTH_USER_MODEL = 'userManagement.MyUser'
 CUSTOM_USER_MODEL = 'userManagement.MyUser'
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*']  # TODO: Change for production
 AUTHENTICATION_BACKENDS = (
     'django.contrib.auth.backends.ModelBackend',
     'userManagement.auth_backends.MyUserModelBackend'
@@ -105,9 +105,9 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'datingAPI.wsgi.application'
+# WSGI_APPLICATION = 'datingAPI.wsgi.application'
 
-ASGI_APPLICATION = 'datingAPI.asgi.application'
+ASGI_APPLICATION = 'myapp.routing.application'
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',

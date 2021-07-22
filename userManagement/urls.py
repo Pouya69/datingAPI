@@ -11,6 +11,7 @@ urlpatterns = [
     path('logout', views.LogoutView.as_view(), name='logout'),  # For POST logout a user
     path('register', views.RegisterView.as_view(), name='register'),  # For POST register a user
     path('google', views.GoogleView.as_view(), name='google'),  # add path for google authentication
+    path('forgotPassword', views.ForgotPasswordView.as_view(), name='forgot_password'),
 
     path('refreshToken', views.RefreshTokenn.as_view(), name='refreshToken'),
     path('verifyAgain', views.sendVerifyLinkAgain, name='verifyAgain'),

@@ -1,148 +1,186 @@
 import json
-# from asgiref.sync import async_to_sync
-from channels.generic.websocket import AsyncWebsocketConsumer
-from .models import Message, Group, MyUser
-from .serializers import MessageSerializer, MessageSerializerWrite
+from channels.consumer import AsyncConsumer
+from channels.db import database_sync_to_async
+
+from userManagement.models import MyUser
+from .models import Group, Message
+from .serializers import MessageSerializer
 from django.contrib.auth.models import AnonymousUser
+import asyncio
 
 
-def message_to_json(message):
-    try:
-        result = {
-            'group_id': str(message.group_id.id),
-            'creator': message.creator.username,
-            'content': message.content,
-            'created_at': str(message.created_at),
-            'file_url': message.file_url  # Check here
-        }
-        if message.replying_to is not None:
-            result['replying_to'] = message.replying_to.username
-    except:
-        result = {}
+class ChatConsumer(AsyncConsumer):
+    @database_sync_to_async
+    def get_messages(self):
+        count = Message.objects.filter(group_id=self.group_obj).count()
+        if count >= 20:
+            return Message.objects.filter(
+                group_id=self.group_obj
+            ).order_by('-created_at')[:19]
+        return Message.objects.filter(
+            group_id=self.group_obj
+        ).order_by('-created_at')
 
-    return result
+    @database_sync_to_async
+    def create_message(self, data):
+        msg = Message()
+        msg.creator = data['creator']
+        msg.content = data['content']
+        msg.file_url = data['file_url']
+        if data['replying_to'] is not None:
+            msg.replying_to = data['replying_to']
+        msg.group_id = data['group_id']
+        msg.save()
+        return msg
 
+    @database_sync_to_async
+    def serialize_message(self, msgs):
+        return MessageSerializer(msgs, many=True).data
 
-def messages_to_json(messages):
-    result = []
-    for message in messages:
-        result.append(message_to_json(message))
-    return result
-
-
-class ChatConsumer(AsyncWebsocketConsumer):  # TODO: Check if user is looking at the chat
-    async def connect(self):
-        # The user gets in the chat page so it means he/she is looking.
-        self.room_name = self.scope['url_route']['kwargs']['room_name']
-        self.chat_id = int(self.room_name)
-        self.room_group_name = 'chat_%s' % self.room_name
-        self.user = self.scope['user']
-        self.group_obj = Group.objects.get(id=self.chat_id)
-        group_users = self.group_obj.users.all()
-        if group_users.count() == 2:  # me and another user
-            for group_user in group_users:
-                if not group_user == self.user:
-                    if self.user not in group_user.block_list.all():
-                        if self.user is not AnonymousUser() and self.user in self.group_obj.users.all():
-                            # Connect to the group
-                            await self.channel_layer.group_add(
-                                self.room_group_name,
-                                self.channel_name
-                            )
-
-                            await self.accept()
-        else:
-            if self.user is not AnonymousUser() and self.user in self.group_obj.users.all():
-                # Connect to the group
-                await self.channel_layer.group_add(
-                    self.room_group_name,
-                    self.channel_name
-                )
-
-                await self.accept()
-
-    async def disconnect(self, close_code):
-        # Leave the websocket and the chat page not deleting or anything. ( User is not looking at the chat )
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
+    @database_sync_to_async
+    def serialize_message_2(self, msgs):
+        return MessageSerializer(msgs, many=False).data
 
     async def fetch_messages(self):
-        try:
+        #try:
             # Get the latest 19 messages by date
+        msgs = await self.get_messages()
+        if msgs is not None:
             content = {
-                'command': 'messages',
-                'messages': messages_to_json(
-                    Message.objects.filter(
-                        group_id=Group.objects.get(id=self.chat_id)
-                    ).order_by('-created_at')[19]
-                ),
+                'type': 'websocket.send',
+                'text': json.dumps({
+                    "messages": await self.serialize_message(msgs)
+                })
             }
-        except:
-            content = {}
+        else:
+            content = {
+                'type': 'websocket.send',
+                'text': json.dumps({
+                    'messages': []
+                })
+            }
+        #except:
+            #
         # Send the message to the user that requested this only not the group.
         await self.send_socket_message(content)  # To the requester only
 
     async def new_message(self, j_data):
         data = j_data['message']
         # For the file. We'll work on it later.
-        message = None
+        #try:
+        replying_to = None
         try:
-            replying_to = None
-            try:
-                replying_to = MyUser.objects.get(username=str(data['replying_to'])) if 'replying_to' in data else None
-            except MyUser.DoesNotExist:
-                pass
-            # We will upload the file from http and then from fetch we provide the download link.
-            data['file_url'] = str(data['file_url']) if 'file_url' in data else ""
-            data['replying_to'] = replying_to
-            data['group_id'] = self.group_obj
-            data['creator'] = self.user
-            serializer = MessageSerializerWrite(data=data)
-            if serializer.is_valid():
-                serializer.save()
-                message = serializer.Meta.model
-        except:
+            replying_to = MyUser.objects.get(username=str(data['replying_to'])) if 'replying_to' in data else None
+        except MyUser.DoesNotExist:
             pass
-
+        # We will upload the file from http and then from fetch we provide the download link.
+        data['file_url'] = str(data['file_url']) if 'file_url' in data else ""
+        data['replying_to'] = replying_to
+        data['group_id'] = self.group_obj
+        data['creator'] = self.user
+        message = await self.create_message(data)
+        #except:
+            #pass
         # Send message to the whole group.
-        if message:
-            return self.send_socket_message_group({
-                'command': 'new_message',
-                'message': {
-                    MessageSerializer(message, many=False).data
-                }
-            })
+
+        return await self.send_socket_message_group({'message': await self.serialize_message_2(message)})
+
+    @database_sync_to_async
+    def get_count(self):
+        return self.group_obj.users.all().count()
+
+    @database_sync_to_async
+    def check_me(self):
+        if self.user in self.group_obj.users.all():
+            return True
+
+    @database_sync_to_async
+    def check_block(self):
+        for group_user in self.group_obj.users.all():
+            if not group_user == self.user:
+                if self.user in group_user.block_list.all():
+                    return False
+        return True
+
+    async def websocket_connect(self, message):
+        self.group_name = self.scope['url_route']['kwargs']['chat_id']
+        self.chat_id = int(self.group_name)
+        self.room_group_name = 'chat_%s' % self.group_name
+        self.user = self.scope['user']
+        self.group_obj = await self.get_chat()
+        if self.group_obj is not None:
+            group_users = self.group_obj.users.all()
+            count = await self.get_count()
+            if count == 2:  # me and another user
+                if await self.check_block():
+                    if self.user is not AnonymousUser() and await self.check_me() is True:
+                        # Connect to the group
+                        print("Ok")
+                        await self.channel_layer.group_add(
+                            self.room_group_name,
+                            self.channel_name
+                        )  # Add to redis
+
+                        await self.send({"type": "websocket.accept"})
+
+                        await self.send_socket_message_group({"alert": f"User {self.user.username} is online"})
+                        # await asyncio.sleep(5)
+                        # await self.send({"type": "websocket.close"})
+            else:
+                if self.user is not AnonymousUser() and await self.check_me() is True:
+                    print("Ok2")
+                    # Connect to the group
+                    await self.channel_layer.group_add(
+                        self.room_group_name,
+                        self.channel_name
+                    )
+
+                    await self.send_socket_message_group({"alert": f"User {self.user.username} is online"})
+                    # await asyncio.sleep(5)
+                    # await self.send({"type": "websocket.close"})
+
+    async def websocket_disconnect(self, message):
+        await self.channel_layer.group_discard(
+            self.room_group_name,
+            self.channel_name
+        )
+
+        await self.send({"type": "websocket.close"})
+
+    async def websocket_receive(self, message):
+        data = json.loads(message['text'])
+        if data['command'] == "fetch_messages":
+            await self.fetch_messages()
         else:
-            await self.channel_layer.group_discard(
-                self.room_group_name,
-                self.channel_name
-            )
+            await self.new_message(data)
+        #try:
 
-    commands = {"fetch_messages": fetch_messages,
-                "new_message": new_message,
-                }
-
-    async def receive(self, text_data):  # A new message/request from websocket. Can be message or anything.
-        data = json.loads(text_data)
-        try:
-            await self.commands[data["command"]](data)
-        except:
-            pass
+        #except:
+            #pass
 
     async def send_socket_message_group(self, message):  # Send socket message to the whole group
         await self.channel_layer.group_send(
             self.room_group_name,
             {
-                'type': 'chat_message',
-                'message': message
+                "type": "chat_message",
+                "text": json.dumps(message)
             }
         )
 
     async def send_socket_message(self, message):  # Send socket message to the requester only
-        await self.send(text_data=json.dumps(message))
+        await self.send(message)
 
-    async def chat_message(self, event):  # Don't touch this. Default thing
-        message = event['message']
-        await self.send(text_data=json.dumps(message))
+    async def chat_message(self, event):  # Don't touch this. Default thing used by type in group send
+        await self.send(
+            {
+                "type": "websocket.send",
+                "text": event["text"]
+            }
+        )
+
+    @database_sync_to_async
+    def get_chat(self):
+        try:
+            return Group.objects.get(id=self.chat_id)
+        except Group.DoesNotExist:
+            return None

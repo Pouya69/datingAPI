@@ -82,7 +82,7 @@ class User1Test(APITestCase):
             "gender": "female",
             'full_name': "Pouya Salehi2",
             # Each time get a token from google auth api https://developers.google.com/oauthplayground/  with value : https://www.googleapis.com/auth/userinfo.email
-            'token': "ya29.a0ARrdaM_-L-TVy8KBDMGcCSi4TZcUBNyPUDLPR4H1sTr2ZnIPMJJN3fbzW5uvPObvq8mShO-t6HX5Ow-7eTamYbC3wIVs9qkzNGtT1bMkoWdnsOsHP8-lneGKFMXomGXebhN6Jhr6v1uF7qjvlkVdlXdc_YZo"
+            'token': "ya29.a0ARrdaM8Eb9i83AeSIBwv6lZuPokjWlgfK4ki6ahzJ0H3bUhzKB1zUqBlu6TpZM-bwT8TD3BMujB3N-f5TqipCjwL6vi8C1iffcnoQDX1km7zz_adkbGBG9b5lwTCsHfcEw25qgGh203Vty2cqpB7iyZ3_3x5"
         }
         response = self.client.post(path=f"{self.url}/api/google", data=data, format='json')
         json_response = response.json()
@@ -114,6 +114,7 @@ class User1Test(APITestCase):
         self.assertEqual(response.status_code, 200)
         json_response = response.json()
         token = json_response['token']
+        print(json_response['user'])
         self.assertNotEqual(token, "")
         self.token_1 = token
 
@@ -154,6 +155,21 @@ class User1Test(APITestCase):
 
         # self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token_4}")  # For google is Bearer
 
+    def test_forgot_password(self):
+        response = self.client.get(path=f"{self.url}/api/forgotPassword", format='json')
+        self.assertEqual(response.status_code, 200)
+
+        verify_token = VerifyLink.objects.get(user=MyUser.objects.get(username="pouyad_ai"), verify_type="passwordForgot").token
+        data = {
+            "verify_token": verify_token,
+            "new_password": "Pooya12345"
+        }
+        response = self.client.get(path=f"{self.url}/activate/{verify_token}", format='json')
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.post(path=f"{self.url}/api/forgotPassword", data=data, format='json')
+        self.assertEqual(response.status_code, 200)
+
     def test_feeling(self):
         response = self.client.get(path=f"{self.url}/api/feeling", format='json')
         json_response = response.json()
@@ -178,16 +194,19 @@ class User1Test(APITestCase):
         self.assertNotEqual({}, json_response)
 
     def test_change_profile_data(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"token {self.token_2}")
         data = {
             'username': "pouyad_ai8",
             'email': "pouya.psalehi@gmail.com",
             'about': "I just changed my bio",
             'private': 'true',
-            'date_of_birth': "2010-01-01",
+            'date_of_birth': "2007-01-01",
             'full_name': "Gta Meow"
         }
         response = self.client.put(path=f"{self.url}/api/profile", data=data, format='json')
-        self.assertEqual(response.status_code, 405)
+        json_response = response.json()
+        print(f"profile me: {json_response}")
+        self.assertEqual(response.status_code, 200)
 
         data = {
             'username': "pouyad_ai8",
@@ -199,11 +218,11 @@ class User1Test(APITestCase):
         }
         response = self.client.put(path=f"{self.url}/api/profile", data=data, format='json')
         json_response = response.json()
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
 
         data = {
             'username': "pouyad_ai8",
-            'email': "pouyaaa.psalehi@gmail.com",
+            'email': "pouya.psalehi@gmail.com",
             'about': "I just changed my bio",
             'private': 'true',
             'date_of_birth': "2003-01-01",

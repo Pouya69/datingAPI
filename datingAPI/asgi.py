@@ -1,18 +1,7 @@
 import os
+import django
+from channels.routing import get_default_application
 
-from django.core.asgi import get_asgi_application
-import myapp.routing
-from channels.routing import ProtocolTypeRouter, URLRouter
-from myapp.token_auth_channels import TokenAuthMiddlewareStack
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "datingAPI.settings")
-
-
-application = ProtocolTypeRouter({
-  "http": get_asgi_application(),
-  "websocket": TokenAuthMiddlewareStack(
-        URLRouter(
-            myapp.routing.websocket_urlpatterns
-        )
-  ),
-})
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'djangoProject2.settings')
+django.setup()
+application = get_default_application()
