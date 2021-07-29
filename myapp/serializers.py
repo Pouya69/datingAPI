@@ -34,11 +34,29 @@ class GroupIdSerializerName(serializers.ModelSerializer):
         fields = ['id']
 
 
+class GroupIdSerializerName2(serializers.ModelSerializer):
+    id = serializers.CharField()
+
+    class Meta:
+        model = Group
+        fields = ['name']
+
+
+class MessageSerializerMain(serializers.ModelSerializer):
+    group_id = GroupIdSerializerName(many=False, read_only=True)
+    group_name = GroupIdSerializerName2(many=False, read_only=True)
+
+    class Meta:
+        model = Message
+        fields = ['group_name', 'group_id', 'id', 'creator']
+
+
 # Message Serializer
 class MessageSerializer(serializers.ModelSerializer):
     replying_to = UserSerializerName(many=False, read_only=True)
     creator = UserSerializerName(many=False, read_only=True)
     group_id = GroupIdSerializerName(many=False, read_only=True)
+    group_name = GroupIdSerializerName2(many=False, read_only=True)
 
     """For Serializing Message"""
     class Meta:

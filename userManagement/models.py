@@ -68,7 +68,7 @@ class MyUser(AbstractBaseUser):
     full_name = models.CharField(blank=False, null=False, default="", max_length=20)
     date_of_birth = models.DateField(blank=False, null=False, default=date.fromisoformat("2000-01-01"))
     profile_pic = models.ImageField(upload_to = 'pics/', blank=True, null=True, default=None)
-    gender = models.BooleanField(default=True)
+    gender = models.CharField(max_length=10)
     premium_days_left = models.IntegerField(default=0)
     username = models.CharField(blank=False, unique=True, max_length=15)
     friends = models.ManyToManyField('MyUser', default=None)

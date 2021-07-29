@@ -82,7 +82,7 @@ class User1Test(APITestCase):
             "gender": "female",
             'full_name': "Pouya Salehi2",
             # Each time get a token from google auth api https://developers.google.com/oauthplayground/  with value : https://www.googleapis.com/auth/userinfo.email
-            'token': "ya29.a0ARrdaM8Eb9i83AeSIBwv6lZuPokjWlgfK4ki6ahzJ0H3bUhzKB1zUqBlu6TpZM-bwT8TD3BMujB3N-f5TqipCjwL6vi8C1iffcnoQDX1km7zz_adkbGBG9b5lwTCsHfcEw25qgGh203Vty2cqpB7iyZ3_3x5"
+            'token': "ya29.a0ARrdaM_r0zFJIAi50Z1vZZr-GHEGDI04kGkmNvxJD9y_NSc_tlDLQUgxpLcWnjSiB7WCah-yfjMgxcb-u8Hc8lRSmnrM9AUSv_2WziLPfYuweU3v34cFnFFeSn5XvEH0qZSkTHPW6g90RPwfQ6bKwf7AklG8"
         }
         response = self.client.post(path=f"{self.url}/api/google", data=data, format='json')
         json_response = response.json()

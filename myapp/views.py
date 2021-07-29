@@ -23,7 +23,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # To get data from headers : request.META["HTTP_AUTHORIZATION"]
 
 def index(request):
-    return render(request, 'roompick.html')
+    return render(request, 'chat/index.html')
 
 
 def room(request, chat_id=None):
@@ -31,7 +31,7 @@ def room(request, chat_id=None):
         try:
             Group.objects.get(id=int(chat_id))
             # Later on we'll use json not html.
-            return render(request, 'room.html', {
+            return render(request, 'chat/chat.html', {
                 'room_name': chat_id
             })
         except:

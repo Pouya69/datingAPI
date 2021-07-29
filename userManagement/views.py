@@ -164,9 +164,9 @@ class RegisterView(APIView):
         try:
             data = JSONParser().parse(request)
             if data['gender'] == 'male':
-                data['gender'] = True
-            else:
-                data['gender'] = False
+                pass
+            elif data['gender'] == 'female':
+                pass
             date_of_birth = date.fromisoformat(data['date_of_birth'])
             if int((date.today() - date_of_birth).days / 365) < 13:
                 return JsonResponse({"status": "Should be more than 13"}, status=408)
@@ -260,9 +260,9 @@ class GoogleView(APIView):
         except MyUser.DoesNotExist:
             try:
                 if dataa['gender'] == 'male':
-                    gender = True
+                    pass
                 else:
-                    gender = False
+                    pass
                 date_of_birth = date.fromisoformat(dataa['date_of_birth'])
                 if int((date.today() - date_of_birth).days / 365) < 13:
                     return JsonResponse({"status": "Should be more than 13"}, status=408)
@@ -278,7 +278,7 @@ class GoogleView(APIView):
                 user.username = dataa['username']
                 user.full_name = dataa['full_name']
                 user.date_of_birth = date_of_birth
-                user.gender = gender
+                user.gender = dataa['gender']
                 user.account_type = "google"
                 # provider random default password
                 user.is_verified = True  # No verification for Google users
@@ -346,7 +346,6 @@ class ForgotPasswordView(APIView):
 class VerifyView(APIView):
     def get(self, request, token=None):
         if token:
-            # print(token)
             try:
                 p = VerifyLink.objects.get(token=token)
             except VerifyLink.DoesNotExist:
@@ -501,7 +500,6 @@ class StoryView(APIView):
                 story.save()
                 video = VideoFileClip(story.clip.path)
                 seconds = int(video.duration)
-                print(seconds)
                 if seconds > 10:
                     video.close()
                     story.clip.delete()
@@ -586,7 +584,7 @@ class FeelingsView(APIView):
 # TESTED
 
 
-class ProfilePictureView(APIView):
+class ProfilePictureView(APIView):  # TODO: In client side. Make a limitation (too fast)
     authentication_classes = [authentication.TokenAuthentication, JWTAuthentication]
     permission_classes = (IsAuthenticated,)
     parser_classes = (MultiPartParser, )
@@ -665,9 +663,8 @@ class UsersListView(APIView):
             return JsonResponse(final_data, status=200)
         try:
             reqGen = data['reqGender']
-            reqGen = True if reqGen == "true" else False
         except KeyError:
-            reqGen = True if me.gender is False else False
+            reqGen = "male" if me.gender == "female" else "female"
         minterests = str_to_list(me.interests)
         if not minterests:
             return JsonResponse({'status': 'YOUR INTERESTS EMPTY'}, status=405)
@@ -842,9 +839,6 @@ class ProfileMeView(APIView):
                     return JsonResponse({'status': 'Invalid token'}, status=403)
             data = JSONParser().parse(request)
             try:
-                date_of_birth = date.fromisoformat(data['date_of_birth'])
-                if int((date.today() - date_of_birth).days / 365) < 13:
-                    return JsonResponse({"status": "Should be more than 13"}, status=408)
                 regexx = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
                 if len(data['username']) < 5:
                     return JsonResponse({"status": "username needs to be at least 5 characters long"}, status=402)
@@ -863,7 +857,6 @@ class ProfileMeView(APIView):
                         generateLinkConfirm(me, data['email'])  # We change on confirm of the previous email
             except KeyError:
                 return JsonResponse({"status": "ERROR"}, status=500)
-            data['date_of_birth'] = date_of_birth
             serializer = UpdateUserSerializer(me, data=data)
             if serializer.is_valid():
                 serializer.save()
@@ -1041,7 +1034,7 @@ class DateView(APIView):
             return JsonResponse({'status': 'type Key Error'}, status=404)
         if my_choice:  # If a normal date request: send notifications to both
             pass
-        if with_who.gender is True:
+        if with_who.gender == "female":
             date = Date(male_user=with_who, female_user=me, creator=me, request_or_hidden=my_choice, female=True)
         else:
             date = Date(male_user=me, female_user=with_who, creator=me, request_or_hidden=my_choice, male=True)

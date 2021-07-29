@@ -38,7 +38,7 @@ class LoginUserSerializer(serializers.ModelSerializer):
 class UpdateUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = MyUser
-        fields = ['username', 'about', 'private', 'date_of_birth', 'full_name']
+        fields = ['username', 'about', 'private', 'full_name']
 
 
 class UserSerializer(serializers.ModelSerializer):

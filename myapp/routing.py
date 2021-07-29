@@ -2,7 +2,7 @@ from django.conf.urls import url
 from channels.routing import ProtocolTypeRouter, URLRouter
 from django.core.asgi import get_asgi_application
 
-from .consumers import ChatConsumer
+from .consumers import ChatConsumer, MainPageConsumer
 from .token_auth_channels import TokenAuthMiddlewareStack
 from channels.security.websocket import AllowedHostsOriginValidator
 
@@ -12,6 +12,7 @@ application = ProtocolTypeRouter({
         TokenAuthMiddlewareStack(
             URLRouter(
                 [
+                    url(r"^groups", MainPageConsumer().as_asgi()),
                     url(r"^messages/(?P<chat_id>[\w.@+-]+)", ChatConsumer().as_asgi())
                 ]
             )
