@@ -159,28 +159,44 @@ class LoginView(APIView):
 # TESTED SUCCESS
 
 
+class UserNameCheckView(APIView):
+    def post(self, request):
+        data = JSONParser().parse(request)
+        username = data['username']
+        if not re.match("^[a-z0-9_]*$", data['username']) or not data['username'][0].isalpha():
+            return JsonResponse({"status": "Invalid characters in username"}, status=402)
+        for word in swear_words:
+            if word in data['username']:
+                return JsonResponse({"status": "username is offensive"}, status=410)
+        if len(data['username']) < 5:
+            return JsonResponse({"status": "username needs to be at least 5 characters long"}, status=406)
+        try:
+            _ = MyUser.objects.get(username=username).username
+            return JsonResponse({'status': "Username already taken"}, status=404)
+        except MyUser.DoesNotExist:
+            return JsonResponse({'status': "Username available"}, status=200)
+        except KeyError:
+            return JsonResponse({'status': "No Username Provided"}, status=405)
+
+
 class RegisterView(APIView):
     def post(self, request):
         try:
             data = JSONParser().parse(request)
-            if data['gender'] == 'male':
-                pass
-            elif data['gender'] == 'female':
-                pass
             date_of_birth = date.fromisoformat(data['date_of_birth'])
             if int((date.today() - date_of_birth).days / 365) < 13:
                 return JsonResponse({"status": "Should be more than 13"}, status=408)
             data['date_of_birth'] = date_of_birth
             try:
-                if not re.match("^[a-z0-9_]*$", data['username']) or not data['username'][0].isalpha():
-                    return JsonResponse({"status": "Invalid characters in username"}, status=402)
                 if len(data['password']) < 8:
                     return JsonResponse({"status": "Password needs to be at least 5 characters long"}, status=411)
                 regexx = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
                 if not re.match(regexx, data['email']):
-                    return JsonResponse({"status": "Invalid characters in email"}, status=402)
+                    return JsonResponse({"status": "Invalid characters in email"}, status=405)
+                if not re.match("^[a-z0-9_]*$", data['username']) or not data['username'][0].isalpha():
+                    return JsonResponse({"status": "Invalid characters in username"}, status=402)
                 if len(data['username']) < 5:
-                    return JsonResponse({"status": "username needs to be at least 5 characters long"}, status=402)
+                    return JsonResponse({"status": "username needs to be at least 5 characters long"}, status=406)
                 for word in swear_words:
                     if word in data['username'] or word in data['full_name'].lower():
                         return JsonResponse({"status": "username or name is offensive"}, status=410)
@@ -201,7 +217,7 @@ class RegisterView(APIView):
                 return JsonResponse(serializer.errors, status=400)
 
         except:
-            return JsonResponse({"status": "SORRY"})
+            return JsonResponse({"status": "SORRY"}, status=500)
 
 
 @csrf_exempt
@@ -670,6 +686,7 @@ class UsersListView(APIView):
             return JsonResponse({'status': 'YOUR INTERESTS EMPTY'}, status=405)
         try:
             age_range = int(data['age_range'])
+            country = data['country']
         except KeyError:
             age_range = 100
         except ValueError:
@@ -683,7 +700,7 @@ class UsersListView(APIView):
             except KeyError:
                 with_interests = False
             try:
-                final_data = UserGetSerializer(get_user_by_interests_PREMIUM(minterests, age_range, reqGen, me, with_interests), many=False, context={'request': request}).data
+                final_data = UserGetSerializer(get_user_by_interests_PREMIUM(minterests, age_range, reqGen, me, with_interests, country=country), many=False, context={'request': request}).data
                 # changes in interests and etc.
                 final_data['interests'] = str_to_list(final_data['interests'])
                 return JsonResponse(final_data, status=200)
@@ -897,7 +914,7 @@ class RefreshTokenn(APIView):
             me = request.user
             if me is None:
                 return JsonResponse({'status': 'Invalid token'}, status=403)
-        if not me.account_type == "normal":
+        if not me.account_type == "google":
             token = RefreshToken.for_user(me)  # generate token without username & password
             return JsonResponse({'access_token': str(token.access_token), 'refresh_token': str(token)}, status=201)
         data = JSONParser().parse(request)

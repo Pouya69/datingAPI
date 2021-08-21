@@ -8,6 +8,7 @@ import os
 
 
 class Story(models.Model):
+    is_ad = models.BooleanField(default=False)  # TODO
     clip = models.FileField(upload_to='stories/', null=False, blank=False)
     timestamp = models.DateTimeField(auto_now_add=True)
     # expire_date = timezone.now() + datetime.timedelta(days=1)
@@ -68,13 +69,14 @@ class MyUser(AbstractBaseUser):
     full_name = models.CharField(blank=False, null=False, default="", max_length=20)
     date_of_birth = models.DateField(blank=False, null=False, default=date.fromisoformat("2000-01-01"))
     profile_pic = models.ImageField(upload_to = 'pics/', blank=True, null=True, default=None)
-    gender = models.CharField(max_length=10)
+    gender = models.CharField(max_length=10, choices=(("male", "male"), ("female", "female"), ("other", "other")))
     premium_days_left = models.IntegerField(default=0)
     username = models.CharField(blank=False, unique=True, max_length=15)
     friends = models.ManyToManyField('MyUser', default=None)
     subscription_id_stripe = models.TextField(default="")
     account_type = models.CharField(default="", max_length=10)
     customer_id_stripe = models.TextField(default="")
+    country = models.CharField(default="---", max_length=20)
     dating_with = models.ForeignKey('MyUser', related_name="dating_with_user", on_delete=models.CASCADE, blank=True, null=True)
     users_searched_day = models.IntegerField(default=0)
     users_requested_date_day = models.IntegerField(default=0)

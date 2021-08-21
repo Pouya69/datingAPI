@@ -35,7 +35,7 @@ class GroupIdSerializerName(serializers.ModelSerializer):
 
 
 class GroupIdSerializerName2(serializers.ModelSerializer):
-    id = serializers.CharField()
+    name = serializers.CharField()
 
     class Meta:
         model = Group
@@ -48,7 +48,7 @@ class MessageSerializerMain(serializers.ModelSerializer):
 
     class Meta:
         model = Message
-        fields = ['group_name', 'group_id', 'id', 'creator']
+        fields = ['group_name', 'group_id', 'id', 'creator', 'created_at']
 
 
 # Message Serializer

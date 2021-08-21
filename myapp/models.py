@@ -36,7 +36,6 @@ class Message(models.Model):
     file_url      = models.TextField(default="", null=True, blank=True)
     content       = models.TextField(default="", max_length=3300)
     created_at    = models.DateTimeField(auto_now_add=True)
-    is_received   = models.BooleanField(default=False)
     is_read = models.BooleanField(default=False)
 
     def __str__(self):

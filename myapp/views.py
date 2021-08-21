@@ -117,17 +117,19 @@ class GroupListView(APIView):
             return JsonResponse({'status': 'Invalid token'}, status=403)
         try:
             data_users = data['users']
-            group = Group(owner=me)
+            group_name = data['group_name'] if "group_name" in data else "Chat"
+            group = Group(owner=me, name=group_name)
             group.save()
             for u_username in data_users:
                 try:
                     user = MyUser.objects.get(username=u_username)
-                    if me in user.block_list.all():
-                        return JsonResponse({'status': f'You are blocked by {user.username}'}, status=410)
-                    for user in group.users.all():
-                        if (not check_age(me.get_age()) and check_age(user.get_age())) or (check_age(me.get_age()) and not check_age(user.get_age())):
-                            return JsonResponse({'status': 'Cannot be in group with ages above 18 if you are under 18 and so on'}, status=409)
-                    group.users.add(user)
+                    if not me == user:
+                        if me in user.block_list.all():
+                            return JsonResponse({'status': f'You are blocked by {user.username}'}, status=410)
+                        for user in group.users.all():
+                            if (not check_age(me.get_age()) and check_age(user.get_age())) or (check_age(me.get_age()) and not check_age(user.get_age())):
+                                return JsonResponse({'status': 'Cannot be in group with ages above 18 if you are under 18 and so on'}, status=409)
+                        group.users.add(user)
                 except MyUser.DoesNotExist:
                     group.delete()
                     return JsonResponse({"status": "User not exists GROUP POST"}, status=503)

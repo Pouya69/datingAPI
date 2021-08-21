@@ -82,7 +82,7 @@ class User1Test(APITestCase):
             "gender": "female",
             'full_name': "Pouya Salehi2",
             # Each time get a token from google auth api https://developers.google.com/oauthplayground/  with value : https://www.googleapis.com/auth/userinfo.email
-            'token': "ya29.a0ARrdaM_r0zFJIAi50Z1vZZr-GHEGDI04kGkmNvxJD9y_NSc_tlDLQUgxpLcWnjSiB7WCah-yfjMgxcb-u8Hc8lRSmnrM9AUSv_2WziLPfYuweU3v34cFnFFeSn5XvEH0qZSkTHPW6g90RPwfQ6bKwf7AklG8"
+            'token': "ya29.a0ARrdaM_2hbEL6bznRbsJkBFyzcsu6xRniUazz8iHm0eBgdksGng6OgdooVd-VHL3sCwk9t4Q0n5rF4sFczuB_7C1M1Xh5dCHlFclRRJ3popNpTdyYEEIMb3ycfdvlaL1kbsGSVTctzk-6FyJXACA178L_ScK"
         }
         response = self.client.post(path=f"{self.url}/api/google", data=data, format='json')
         json_response = response.json()
@@ -198,6 +198,7 @@ class User1Test(APITestCase):
         data = {
             'username': "pouyad_ai8",
             'email': "pouya.psalehi@gmail.com",
+            "country": "Canada",
             'about': "I just changed my bio",
             'private': 'true',
             'date_of_birth': "2007-01-01",
@@ -212,6 +213,7 @@ class User1Test(APITestCase):
             'username': "pouyad_ai8",
             'email': "pouya.psalehi@gmail.com",
             'about': "I just changed my bio",
+            "country": "Canada",
             'private': 'true',
             'date_of_birth': "2001-01-01",
             'full_name': "Gta Cat"
@@ -224,6 +226,7 @@ class User1Test(APITestCase):
             'username': "pouyad_ai8",
             'email': "pouya.psalehi@gmail.com",
             'about': "I just changed my bio",
+            "country": "Canada",
             'private': 'true',
             'date_of_birth': "2003-01-01",
             'full_name': "Pouya Salehi"

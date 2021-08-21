@@ -2,6 +2,7 @@ import json
 from channels.consumer import AsyncConsumer
 from channels.db import database_sync_to_async
 
+from datingAPI.appProcessing import get_download_link_from_file
 from userManagement.models import MyUser
 from .models import Group, Message
 from .serializers import MessageSerializer, MessageSerializerMain
@@ -11,14 +12,22 @@ import asyncio
 
 class ChatConsumer(AsyncConsumer):
     @database_sync_to_async
-    def get_messages(self):
-        count = Message.objects.filter(group_id=self.group_obj).count()
-        if count >= 20:
+    def get_messages(self, message_id=None):
+        if message_id is None:
+            if Message.objects.filter(group_id=self.group_obj).count() >= 20:
+                return Message.objects.filter(
+                    group_id=self.group_obj
+                ).order_by('-created_at')[:19]
+            return Message.objects.filter(
+                group_id=self.group_obj
+            ).order_by('-created_at')
+        if Message.objects.filter(group_id=self.group_obj, id__lt=message_id).count() >= 20:
             return Message.objects.filter(
                 group_id=self.group_obj
             ).order_by('-created_at')[:19]
         return Message.objects.filter(
-            group_id=self.group_obj
+            group_id=self.group_obj,
+            id__lt=message_id
         ).order_by('-created_at')
 
     @database_sync_to_async
@@ -41,10 +50,13 @@ class ChatConsumer(AsyncConsumer):
     def serialize_message_2(self, msgs):
         return MessageSerializer(msgs, many=False).data
 
-    async def fetch_messages(self):
+    async def fetch_messages(self, message_id=None):
         #try:
             # Get the latest 19 messages by date
-        msgs = await self.get_messages()
+        if message_id is None:
+            msgs = await self.get_messages()
+        else:
+            msgs = await self.get_messages(message_id)
         if msgs is not None:
             content = {
                 'type': 'websocket.send',
@@ -86,10 +98,28 @@ class ChatConsumer(AsyncConsumer):
         return await self.send_socket_message_group({'message': await self.serialize_message_2(message)})
 
     async def online_command(self):
-        return await self.send_socket_message_group({"Online": self.user.username})
+        return await self.send_socket_message_group({"online": self.user.username})
+
+    async def offline_command(self):
+        return await self.send_socket_message_group({"offline": self.user.username})
 
     async def typing_command(self):
-        return await self.send_socket_message_group({"Typing": self.user.username})
+        return await self.send_socket_message_group({"typing": self.user.username})
+
+    async def stop_typing_command(self):
+        return await self.send_socket_message_group({"stop_typing": self.user.username})
+
+    async def seen_messages_command(self, message_ids=None):
+        if message_ids is None:
+            return
+        for message_id in message_ids:
+            try:
+                msg = Message.objects.get(id=int(message_id))
+                msg.is_read = True
+                msg.save()
+            except:
+                return
+        return await self.send_socket_message_group({"seen_messages": message_ids, "seen_by": self.user.username})
 
     @database_sync_to_async
     def get_count(self):
@@ -119,7 +149,7 @@ class ChatConsumer(AsyncConsumer):
             count = await self.get_count()
             if count == 2:  # me and another user
                 if await self.check_block():
-                    if self.user is not AnonymousUser() and await self.check_me() is True:
+                    if self.user is not AnonymousUser() and self.user is not None and await self.check_me() is True:
                         # Connect to the group
                         await self.channel_layer.group_add(
                             self.room_group_name,
@@ -132,7 +162,7 @@ class ChatConsumer(AsyncConsumer):
                         # await asyncio.sleep(5)
                         # await self.send({"type": "websocket.close"})
             else:
-                if self.user is not AnonymousUser() and await self.check_me() is True:
+                if self.user is not AnonymousUser() and self.user is not None and await self.check_me() is True:
                     # Connect to the group
                     await self.channel_layer.group_add(
                         self.room_group_name,
@@ -144,6 +174,7 @@ class ChatConsumer(AsyncConsumer):
                     # await self.send({"type": "websocket.close"})
 
     async def websocket_disconnect(self, message):
+        await self.offline_command()
         await self.channel_layer.group_discard(
             self.room_group_name,
             self.channel_name
@@ -159,8 +190,14 @@ class ChatConsumer(AsyncConsumer):
             await self.new_message(data)
         elif data['command'] == "chat_online":
             await self.online_command()
+        elif data['command'] == "chat_offline":
+            await self.offline_command()
         elif data['command'] == "typing":
             await self.typing_command()
+        elif data['command'] == "stop_typing":
+            await self.stop_typing_command()
+        elif data['command'] == "seen":
+            await self.seen_messages_command(data['message_ids'])
         #try:
 
         #except:
@@ -197,33 +234,32 @@ class ChatConsumer(AsyncConsumer):
 class MainPageConsumer(AsyncConsumer):
 
     @database_sync_to_async
-    def get_group_data(self):
+    def get_group_data(self):  # For the first time that page loads
         message_data = {}
         for group in self.user.chat_list.all():
+            message_data[f"{group.id}"] = {}
             # message_data[f"{group.id}_{group.name}"] = MessageSerializer(Message.objects.filter(group_id=group).last(), many=False).data
-            message_data[f"{group.id}_{group.name}"] = MessageSerializerMain(Message.objects.filter(group_id=group).last(), many=False).data
+            message_data[f"{group.id}"]["last_message"] = MessageSerializerMain(Message.objects.filter(group_id=group).last(), many=False).data
+            message_data[f"{group.id}"]["unread_messages"] = Message.objects.filter(group_id=group, is_read=False).exclude(creator=self.user).count()
+            if group.users.all().count() == 2:
+                message_data[f"{group.id}"]["last_messages"]["group_name"] = group.users.all().exclude(username=self.user.username)[0].username
+                message_data[f"{group.id}"]["pic_url"] = get_download_link_from_file(group.users.all().exclude(username=self.user.username)[0])
+            else:
+                message_data[f"{group.id}"]["pic_url"] = get_download_link_from_file(group.group_img)
         return message_data
 
-    @database_sync_to_async
-    def get_group_data_special(self, last_message_id):
-        message_data = {}
-        for group in self.user.chat_list.all():
-            message_data[f"{group.id}_{group.name}"] = MessageSerializerMain(Message.objects.filter(id__gt=last_message_id), many=True).data
-            # message_data[f"{group.id}_{group.name}"] = MessageSerializerMain(Message.objects.filter(group_id=group).last(), many=False).data
-        return message_data
+    async def fetch_live_group(self):
+        while True:
+            await asyncio.sleep(3)
+            final_data = {'type': 'websocket.send', 'text': json.dumps({
+                "groups": await self.get_group_data()
+            })}
 
-    async def fetch_live_group(self, last_message_id=None):
-        final_data = {
-            'type': 'websocket.send',
-            'text': json.dumps({
-                "groups": await self.get_group_data() if last_message_id is None else await self.get_group_data_special(last_message_id)
-            })
-        }
-        return await self.send_socket_message(final_data)
+            await self.send_socket_message(final_data)
 
     async def websocket_connect(self, message):
         self.user = self.scope['user']
-        if self.user is not AnonymousUser():
+        if self.user is not AnonymousUser() and self.user is not None:
             await self.send({"type": "websocket.accept"})
 
     async def websocket_disconnect(self, message):
@@ -232,7 +268,8 @@ class MainPageConsumer(AsyncConsumer):
     async def websocket_receive(self, message):
         data = json.loads(message['text'])
         if data['command'] == "fetch_group_live":
-            last_message_id = int(data['last_message_id'])
+            # group_id = data['group_id'] if not data['group_id'] == "NA" else None
+            # last_message_id = data['last_message_id'] if not data['group_id'] == "NA" else None
             await self.fetch_live_group()
 
     async def send_socket_message(self, message):  # Send socket message to the requester only

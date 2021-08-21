@@ -12,6 +12,7 @@ urlpatterns = [
     path('register', views.RegisterView.as_view(), name='register'),  # For POST register a user
     path('google', views.GoogleView.as_view(), name='google'),  # add path for google authentication
     path('forgotPassword', views.ForgotPasswordView.as_view(), name='forgot_password'),
+    path('usernameCheck', views.UserNameCheckView.as_view(), name='username_check'),
 
     path('refreshToken', views.RefreshTokenn.as_view(), name='refreshToken'),
     path('verifyAgain', views.sendVerifyLinkAgain, name='verifyAgain'),
@@ -37,6 +38,7 @@ urlpatterns = [
     path('interests/<str:username>', views.InterestsView.as_view(), name='interestsUSEROTHER'),
 
     path('feeling', views.FeelingsView.as_view(), name='feelingsUSER'),
+    path('feeling/<str:username>', views.FeelingsView.as_view(), name='feelingsUSER'),
     path('date/<str:date_id>', views.DateView.as_view(), name='dateGET'),  # For Date GET
     path('date', views.DateView.as_view(), name='datePUTPOST'),  # For Date POST and PUT
     path('profilePic', views.ProfilePictureView.as_view(), name='profilepicPOST'),  # For PUT

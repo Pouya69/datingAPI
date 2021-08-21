@@ -178,7 +178,7 @@ def get_user_by_interests(age_range, genderR, me):
                 return randomed
 
 
-def get_user_by_interests_PREMIUM(interests, age_range, genderR, me, with_interests):
+def get_user_by_interests_PREMIUM(interests, age_range, genderR, me, with_interests, country=""):
     tries = 0
     while True:
         tries += 1
@@ -190,6 +190,9 @@ def get_user_by_interests_PREMIUM(interests, age_range, genderR, me, with_intere
                 continue
             if not randomed == me and randomed not in me.friends.all() and me not in randomed.block_list.all() and randomed is not me.dating_with:
                 if abs(randomed.get_age() - me.get_age()) <= age_range:
+                    if not country == "":
+                        if not country == randomed.country:
+                            continue
                     if with_interests:
                         if interest in str_to_list(randomed.interests):
                             me.users_searched_day += 1
