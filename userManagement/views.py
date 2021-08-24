@@ -126,7 +126,7 @@ class LoginView(APIView):
                     return JsonResponse({'status': 'Invalid Password'}, status=404)
                 else:
                     if not user.is_verified:
-                        return JsonResponse({'status': 'NOT VERIFIED'}, status=405)
+                        return JsonResponse({'status': 'NOT VERIFIED', 'email': user.email}, status=405)
                     token, _ = Token.objects.get_or_create(user=user)
                     serializer = LoginUserSerializer(user, many=False, context={'request': request})
                     final_data = serializer.data
@@ -145,7 +145,7 @@ class LoginView(APIView):
                 if not user:
                     return JsonResponse({'status': 'Invalid Password'}, status=404)
                 if not user.is_verified:
-                    return JsonResponse({'status': 'NOT VERIFIED'}, status=405)
+                    return JsonResponse({'status': 'NOT VERIFIED', 'email': user.email}, status=405)
                 token, _ = Token.objects.get_or_create(user=user)
                 serializer = LoginUserSerializer(user, many=False, context={'request': request})
                 final_data = serializer.data
@@ -993,7 +993,7 @@ class DateView(APIView):
     authentication_classes = [authentication.TokenAuthentication, JWTAuthentication]
     permission_classes = (IsAuthenticated,)
 
-    def get(self, request, date_id=None):
+    def get(self, request, date_id=None, requests_or_mine=None):
         me = get_user_by_token(request.META)
         if me is None:
             me = request.user
@@ -1009,9 +1009,17 @@ class DateView(APIView):
                 return JsonResponse(serializer.data, safe=False)
             return JsonResponse({'status': 'ACCESS DENIED'}, safe=False, status=405)
         # date = Date.objects.filter(users__in=[me], allowed=True)
-        dates = Date.objects.filter(creator=me)  # Only the ones that I have sent requests to. others are secret :D
+        if requests_or_mine is None:
+            return JsonResponse({'status': 'No type specified'}, status=406)
+        dates = None
+        if requests_or_mine == "mine":
+            dates = Date.objects.filter(creator=me)  # Only the ones that I have sent requests to. others are secret :D
+        elif requests_or_mine == "requests":
+            dates = Date.objects.filter(users__in=[me], request_or_hidden=True).exclude(creator=me)
+        if dates is None:
+            return JsonResponse({'status': 'invalid type'}, status=408)
         serializer = DateSerializer(dates, many=True, context={'request': request})
-        return JsonResponse(serializer.data, safe=False)
+        return JsonResponse(serializer.data, safe=False, status=200)
 
     def post(self, request):
         me = get_user_by_token(request.META)

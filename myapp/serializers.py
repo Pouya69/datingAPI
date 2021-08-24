@@ -5,10 +5,11 @@ from userManagement.models import MyUser
 
 
 class DateSerializer(serializers.ModelSerializer):
-    """For Serializing Message"""
+    id = serializers.IntegerField(read_only=True, many=False)
+
     class Meta:
         model = Date
-        fields = ['users']
+        fields = ['users', 'id']
 
 
 class GroupPictureSerializer(serializers.ModelSerializer):
@@ -45,6 +46,7 @@ class GroupIdSerializerName2(serializers.ModelSerializer):
 class MessageSerializerMain(serializers.ModelSerializer):
     group_id = GroupIdSerializerName(many=False, read_only=True)
     group_name = GroupIdSerializerName2(many=False, read_only=True)
+    created_at = serializers.DateTimeField(many=False, format="%Y-%m-%dT%H:%M:%S", read_only=True)
 
     class Meta:
         model = Message
@@ -57,6 +59,7 @@ class MessageSerializer(serializers.ModelSerializer):
     creator = UserSerializerName(many=False, read_only=True)
     group_id = GroupIdSerializerName(many=False, read_only=True)
     group_name = GroupIdSerializerName2(many=False, read_only=True)
+    created_at = serializers.DateTimeField(many=False,format="%Y-%m-%dT%H:%M:%S", read_only=True)
 
     """For Serializing Message"""
     class Meta:
