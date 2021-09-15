@@ -129,6 +129,7 @@ class LoginView(APIView):
                         return JsonResponse({'status': 'NOT VERIFIED', 'email': user.email}, status=405)
                     token, _ = Token.objects.get_or_create(user=user)
                     serializer = LoginUserSerializer(user, many=False, context={'request': request})
+                    serializer.data['profile_pic'] = get_download_link_from_file(serializer.data['profile_pic'])
                     final_data = serializer.data
                     final_data["interests"] = str_to_list(final_data["interests"])
                     return JsonResponse({'token': token.key, 'user': final_data}, status=200)
@@ -148,6 +149,7 @@ class LoginView(APIView):
                     return JsonResponse({'status': 'NOT VERIFIED', 'email': user.email}, status=405)
                 token, _ = Token.objects.get_or_create(user=user)
                 serializer = LoginUserSerializer(user, many=False, context={'request': request})
+                serializer.data['profile_pic'] = get_download_link_from_file(serializer.data['profile_pic'])
                 final_data = serializer.data
                 final_data["interests"] = str_to_list(final_data["interests"])
                 return JsonResponse({'token': token.key, 'user': final_data}, status=200)
@@ -306,6 +308,7 @@ class GoogleView(APIView):
         token = RefreshToken.for_user(user)  # generate token without username & password
         response = {}
         serializer = LoginUserSerializer(user, many=False, context={'request': request})
+        serializer.data['profile_pic'] = get_download_link_from_file(serializer.data['profile_pic'])
         final_data = serializer.data
         final_data["interests"] = str_to_list(final_data["interests"])
         response['user'] = final_data
@@ -623,7 +626,9 @@ class ProfilePictureView(APIView):  # TODO: In client side. Make a limitation (t
             img.verify()
             me.profile_pic.save(f.name, f, save=True)
             me.save()  # Here if error
-            return JsonResponse({'status': 'SUCCESS UPLOAD'}, status=200)
+            serializer = PictureSerializer(me, many=False, context={'request': request})
+            serializer.data['profile_pic'] = get_download_link_from_file(serializer.data['profile_pic'])
+            return JsonResponse(serializer.data, status=200)
         except:
             return JsonResponse({"status": "Unsupported image type"}, status=401)
 
@@ -818,6 +823,7 @@ class ProfileMeView(APIView):
                 if me is None:
                     return JsonResponse({'status': 'Invalid token'}, status=403)
             serializer = LoginUserSerializer(me, many=False, context={'request': request})
+            serializer.data['profile_pic'] = get_download_link_from_file(serializer.data['profile_pic'])
             serializer.data['interests'] = str_to_list(serializer.data['interests'])
             return JsonResponse(serializer.data, status=200)
         except MyUser.DoesNotExist:
@@ -900,6 +906,7 @@ class ProfileMeView(APIView):
             if not user.check_password(password):
                 return JsonResponse({'status': "Invalid credentials"}, status=404)
             user.delete()
+            return JsonResponse({'status': f"Deleted {username}"}, status=201)
         except:
             return JsonResponse({'status': "Invalid credentials"}, status=404)
 

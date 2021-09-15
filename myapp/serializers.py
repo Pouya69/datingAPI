@@ -59,7 +59,7 @@ class MessageSerializer(serializers.ModelSerializer):
     creator = UserSerializerName(many=False, read_only=True)
     group_id = GroupIdSerializerName(many=False, read_only=True)
     group_name = GroupIdSerializerName2(many=False, read_only=True)
-    created_at = serializers.DateTimeField(many=False,format="%Y-%m-%dT%H:%M:%S", read_only=True)
+    created_at = serializers.DateTimeField(many=False, format="%Y-%m-%dT%H:%M:%S", read_only=True)
 
     """For Serializing Message"""
     class Meta:
@@ -71,6 +71,7 @@ class MessageSerializerWrite(serializers.ModelSerializer):
     replying_to = UserSerializerName(many=False, read_only=True)
     creator = UserSerializerName(many=False, read_only=True)
     group_id = GroupIdSerializerName(many=False, read_only=True)
+
     class Meta:
         model = Message
         fields = ['group_id', 'creator', 'replying_to', 'content', 'file_url']

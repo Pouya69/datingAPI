@@ -238,9 +238,10 @@ class MainPageConsumer(AsyncConsumer):
         message_data = {}
         for group in self.user.chat_list.all():
             message_data[f"{group.id}"] = {}
+            message_data[f"{group.id}"]["group_name"] = group.name
             # message_data[f"{group.id}_{group.name}"] = MessageSerializer(Message.objects.filter(group_id=group).last(), many=False).data
-            message_data[f"{group.id}"]["last_message"] = MessageSerializerMain(Message.objects.filter(group_id=group).last(), many=False).data
-            message_data[f"{group.id}"]["unread_messages"] = Message.objects.filter(group_id=group, is_read=False).exclude(creator=self.user).count()
+            message_data[f"{group.id}"]["last_message"] = MessageSerializer(Message.objects.filter(group_id=group).last(), many=False).data
+            message_data[f"{group.id}"]["unread_messages"] = MessageSerializer(Message.objects.filter(group_id=group, is_read=False).exclude(creator=self.user), many=True)
             if group.users.all().count() == 2:
                 message_data[f"{group.id}"]["last_messages"]["group_name"] = group.users.all().exclude(username=self.user.username)[0].username
                 message_data[f"{group.id}"]["pic_url"] = get_download_link_from_file(group.users.all().exclude(username=self.user.username)[0])
