@@ -321,12 +321,14 @@ class ForgotPasswordView(APIView):
     authentication_classes = [authentication.TokenAuthentication]
     permission_classes = (IsAuthenticated,)
 
-    def get(self, request):
-        me = get_user_by_token(request.META)
-        if me is None:
-            me = request.user
-            if me is None:
-                return JsonResponse({'status': 'Invalid token'}, status=403)
+    def put(self, request):
+        data = JSONParser().parse(request)
+        try:
+            me = MyUser.objects.get(email=data['email'])
+        except MyUser.DoesNotExist:
+            return JsonResponse({'status': 'No user exists with this email'}, status=404)
+        except KeyError:
+            return JsonResponse({'status': 'ERROR'}, status=500)
         if not me.account_type == "normal":
             return JsonResponse({'status': 'You cannot change a third party account password'}, status=406)
         generateLinkPassword(me)

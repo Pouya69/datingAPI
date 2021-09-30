@@ -156,7 +156,10 @@ class User1Test(APITestCase):
         # self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token_4}")  # For google is Bearer
 
     def test_forgot_password(self):
-        response = self.client.get(path=f"{self.url}/api/forgotPassword", format='json')
+        data = {
+            "email": "pooyasalehi69@gmail.com"
+        }
+        response = self.client.put(path=f"{self.url}/api/forgotPassword", format='json', data=data)
         self.assertEqual(response.status_code, 200)
 
         verify_token = VerifyLink.objects.get(user=MyUser.objects.get(username="pouyad_ai"), verify_type="passwordForgot").token
