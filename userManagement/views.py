@@ -336,29 +336,26 @@ class ForgotPasswordView(APIView):
         ###################
 
     def post(self, request):
-        me = get_user_by_token(request.META)
-        if me is None:
-            me = request.user
-            if me is None:
-                return JsonResponse({'status': 'Invalid token'}, status=403)
         data = JSONParser().parse(request)
         try:
             new_password = data['new_password']
             verify_token = data['verify_token']
         except KeyError:
             return JsonResponse({"status": "Error"}, status=500)
-        if not me.account_type == "normal":
-            return JsonResponse({'status': 'You cannot change a third party account password'}, status=406)
         try:
             v = VerifyLink.objects.get(token=verify_token)
         except VerifyLink.DoesNotExist:
             return JsonResponse({"status": "Verify Token Invalid"}, status=404)
+        me = v.user
+        if not me.account_type == "normal":
+            return JsonResponse({'status': 'You cannot change a third party account password'}, status=406)
         if not v.user == me:
             return JsonResponse({"status": "Not your account"}, status=408)
         if v.extra_data == "OK":
             me.set_password(new_password)
             me.save()
             v.delete()
+            Token.objects.get(user=me).delete()
             return JsonResponse({"status": "Password Changed"}, status=200)
         return JsonResponse({"status": "Not verified"}, status=405)
 
@@ -853,6 +850,7 @@ class ProfileMeView(APIView):
             return JsonResponse({"status": "Password needs to be at least 5 characters long"}, status=411)
         me.set_password(new_password)
         me.save()
+        Token.objects.get(user=me).delete()
         return JsonResponse({'status': 'Password Changed'}, status=200)
 
     def put(self, request):  # Change User Details
